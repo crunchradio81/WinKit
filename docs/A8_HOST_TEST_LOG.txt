@@ -1,0 +1,76 @@
+test_build_pipeline_contract (__main__.A8BuildTests.test_build_pipeline_contract) ... ok
+test_ci_contract_and_no_executed_apk (__main__.A8BuildTests.test_ci_contract_and_no_executed_apk) ... ok
+test_patch_rejects_changed_upstream_template (__main__.A8BuildTests.test_patch_rejects_changed_upstream_template) ... ok
+test_patched_upstream_build_has_java_target_and_class_gate (__main__.A8BuildTests.test_patched_upstream_build_has_java_target_and_class_gate) ... ok
+test_reject_core_missing_winkit_native_gate (__main__.A8BuildTests.test_reject_core_missing_winkit_native_gate) ... ok
+test_reject_extra_abi (__main__.A8BuildTests.test_reject_extra_abi) ... ok
+test_reject_missing_native_library (__main__.A8BuildTests.test_reject_missing_native_library) ... ok
+test_reject_missing_sdl_activity (__main__.A8BuildTests.test_reject_missing_sdl_activity) ... ok
+test_reject_proprietary_machine_disk (__main__.A8BuildTests.test_reject_proprietary_machine_disk) ... ok
+test_reject_stale_packaged_core (__main__.A8BuildTests.test_reject_stale_packaged_core) ... ok
+test_reject_x86_core (__main__.A8BuildTests.test_reject_x86_core) ... ok
+test_valid_structural_fixture (__main__.A8BuildTests.test_valid_structural_fixture) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.013s
+
+OK
+GENERATED BOOT-FIXTURE, NOT BOOTED: /tmp/tmp.zsVlIYCUUx/fixture/machines/YARDOMOB.raw
+SHA256: 1e1e2710033ffd7c39c2d0338c0ba6f698dd306ef7056f2d2da8fa2ae8bfe811
+Expected if a real emulator boots this disk: WINKIT A4 BIOS HDD BOOT OK
+{
+  "boot_verified": false,
+  "classification": "A4_BIOS_ONLY_FIXTURE",
+  "first_sector_signature_55aa": true,
+  "geometry_exactly_matches_file": true,
+  "geometry_expected_bytes": 4128768,
+  "guest_name_verified": false,
+  "image_bytes": 4128768,
+  "network_safe_to_enable": false,
+  "partition_errors": [],
+  "partitions": [],
+  "sectors": 8064
+}
+A6 native launch/snapshot assertions PASS: 38
+test_actual_patch_blocks_floppy_and_reads_config (__main__.A6Patch.test_actual_patch_blocks_floppy_and_reads_config) ... ok
+test_no_windows_disk_images (__main__.A6Patch.test_no_windows_disk_images) ... ok
+test_overlay_contains_native_snapshot (__main__.A6Patch.test_overlay_contains_native_snapshot) ... ok
+test_status_without_fake_elf (__main__.A6Patch.test_status_without_fake_elf) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.004s
+
+OK
+test_app_private_and_no_overwrite (__main__.Integration.test_app_private_and_no_overwrite) ... ok
+test_artifact_media_absent (__main__.Integration.test_artifact_media_absent) ... ok
+test_fails_closed_on_wrong_upstream (__main__.Integration.test_fails_closed_on_wrong_upstream) ... ok
+test_java_import_blocks_geometry (__main__.Integration.test_java_import_blocks_geometry) ... ok
+test_native_precore_lease_and_raw_guard (__main__.Integration.test_native_precore_lease_and_raw_guard) ... ok
+test_patch_copies_geometry (__main__.Integration.test_patch_copies_geometry) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.003s
+
+OK
+test_different_source_fails (__main__.TestPatch.test_different_source_fails) ... ok
+test_gradle_unique (__main__.TestPatch.test_gradle_unique) ... ok
+test_host_tag (__main__.TestPatch.test_host_tag) ... ok
+test_manifest_security (__main__.TestPatch.test_manifest_security) ... ok
+test_native_insert_once (__main__.TestPatch.test_native_insert_once) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.001s
+
+OK
+A6 manifest PASS: 147 source files; Android APK NOT built
+
+A6 HOST-GATE PASS. NO Android library/APK or guest boot is asserted.
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.003s
+
+OK
+
+A7 HOST TESTS PASS; Android compilation and runtime NOT verified.
+
+A8 HOST TESTS PASS; no Android ARM64 compilation or boot verified.

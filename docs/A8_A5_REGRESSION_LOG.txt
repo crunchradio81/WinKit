@@ -1,0 +1,24 @@
+A5 C++ raw geometry + container: 48 assertions passed
+A5 Kotlin raw geometry + container: 24 assertions passed
+A5 independent Kotlin smoke install: 10 assertions passed
+test_app_private_and_no_overwrite (__main__.Integration.test_app_private_and_no_overwrite) ... ok
+test_artifact_media_absent (__main__.Integration.test_artifact_media_absent) ... ok
+test_fails_closed_on_wrong_upstream (__main__.Integration.test_fails_closed_on_wrong_upstream) ... ok
+test_java_import_blocks_geometry (__main__.Integration.test_java_import_blocks_geometry) ... ok
+test_native_precore_lease_and_raw_guard (__main__.Integration.test_native_precore_lease_and_raw_guard) ... ok
+test_patch_copies_geometry (__main__.Integration.test_patch_copies_geometry) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.012s
+
+OK
+test_actual_build_contains_a5_gates (__main__.BuildContracts.test_actual_build_contains_a5_gates) ... ok
+test_build_uses_exact_baseline_pins (__main__.BuildContracts.test_build_uses_exact_baseline_pins) ... ok
+test_host_not_claimed_device (__main__.BuildContracts.test_host_not_claimed_device) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.000s
+
+OK
+A5 cumulative source integrity PASSED: 147 files; NO APK or guest disk distributed
+A5 SOURCE/OFFLINE SMOKE TESTS PASS; ANDROID ELF/APK/BOOT NOT VERIFIED

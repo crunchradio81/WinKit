@@ -1,0 +1,19 @@
+{
+  "release": "WinKit311-Android-RD01",
+  "prepared_on": "2026-10-19",
+  "scope": "Research, Android native emulator blueprint, guarded private guest export, IP test harness",
+  "mac_release_untouched": true,
+  "contains_apk": false,
+  "contains_windows_os_or_guest_image": false,
+  "android_runtime_verified": false,
+  "ethnet_android_interop_verified": false,
+  "netbeui_android_mac_verified": false,
+  "host_offline_tests": 10,
+  "host_offline_tests_passed": 10,
+  "next_engineering_gate": "Compare Retro-DOS SDL3 core revision to DOSBox-X 2026.10.01 ETHNET wire protocol and build an ARM64 core",
+  "notes": [
+    "Separate Android project, no Mac RC replacement",
+    "Source private guest disk export is read-only, stopped-working-clone only",
+    "Guest identity must be changed before legacy LAN join"
+  ]
+}

@@ -1,0 +1,48 @@
+test_exact_geometry (__main__.FixtureTests.test_exact_geometry) ... ok
+test_info_and_config (__main__.FixtureTests.test_info_and_config) ... ok
+test_mbr_signature_and_marker (__main__.FixtureTests.test_mbr_signature_and_marker) ... ok
+test_overlap_and_invalid_partition_bounds (__main__.FixtureTests.test_overlap_and_invalid_partition_bounds) ... ok
+test_read_only_inspector_negative (__main__.FixtureTests.test_read_only_inspector_negative) ... ok
+test_refuse_overwrite (__main__.FixtureTests.test_refuse_overwrite) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 1.662s
+
+OK
+OFFLINE POLICY ACCEPTED (SOURCE ONLY; NO GUEST BOOT)
+A4 Kotlin generated-config policy: 1 passed
+A4 Kotlin first-sector evidence: 18 assertions passed
+A3 native boot profile: 13 assertions passed
+A2 native boot-profile gate: 6 assertions passed
+A3 image lease: exclusive, RAII release, filename, symlink checks PASS
+test_different_source_fails (__main__.TestPatch.test_different_source_fails) ... ok
+test_gradle_unique (__main__.TestPatch.test_gradle_unique) ... ok
+test_host_tag (__main__.TestPatch.test_host_tag) ... ok
+test_manifest_security (__main__.TestPatch.test_manifest_security) ... ok
+test_native_insert_once (__main__.TestPatch.test_native_insert_once) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.001s
+
+OK
+test_a3_policy_used_at_boot_gate (__main__.Contracts.test_a3_policy_used_at_boot_gate) ... ok
+test_core_stays_network_disabled (__main__.Contracts.test_core_stays_network_disabled) ... ok
+test_importer_still_private (__main__.Contracts.test_importer_still_private) ... ok
+test_no_microsoft_payload (__main__.Contracts.test_no_microsoft_payload) ... ok
+test_renderer_lease (__main__.Contracts.test_renderer_lease) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.002s
+
+OK
+test_empty_config_rejected (__main__.TestPrepare.test_empty_config_rejected) ... ok
+test_must_match_once (__main__.TestPrepare.test_must_match_once) ... ok
+test_substitutes_only_private_image (__main__.TestPrepare.test_substitutes_only_private_image) ... ok
+test_wrong_path_rejected (__main__.TestPrepare.test_wrong_path_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.001s
+
+OK
+A4 cumulative source integrity PASSED: 112 files; NO APK or guest disk distributed
+A4 OFFLINE SOURCE TESTS PASS (NOT AN ARM64 APK OR AN EMULATOR BOOT)

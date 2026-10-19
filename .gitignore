@@ -1,6 +1,4 @@
-# WinKit source-only repository — never commit guest media
 _external/
-_build_outputs/
 .gradle/
 **/.gradle/
 **/build/
@@ -10,14 +8,12 @@ _build_outputs/
 *.raw
 *.img
 *.vhd
-*.vhdx
-*.vmdk
-*.qcow2
 *.iso
 *.dsk
 *.keystore
 *.jks
 local.properties
 *.partial
-# Generated PoC Kotlin JVM testing artifact
+
+# Locally generated Kotlin proof-of-concept runtime
 reference/PoC1/transport/ethnet-poc-jvm.jar

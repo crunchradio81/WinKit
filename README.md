@@ -1,21 +1,58 @@
-# WinKit 3.11
+# WinKit 3.11 Android — A10 cumulative source
 
-WinKit 3.11 is a personal-use project for running an independent DOS 6.22 / Windows for Workgroups 3.11 guest on macOS and, eventually, Android ARM64.
+**Current status: host-compiled/offline engineering tests only.** No Android ARM64
+emulator library, APK, BIOS boot, DOS 6.22, Windows for Workgroups 3.11 boot,
+or guest NetBEUI-over-Tailscale LAN has been verified.
 
-## Android status
+This is a **local, independent** Android ARM64 virtual PC, **not** VNC, remote
+desktop, or a remote launch of YARDO/YARDO-B. `YARDOMOB` needs its own private
+writable disk, Windows computer name and NIC MAC before Ethernet is enabled.
 
-**Engineering source and offline tests only.** As of the A10 milestone, Android ARM64 DOSBox-X has not been successfully compiled or booted on a device. No working APK, Windows 3.11 boot, or live NetBEUI-over-Tailscale connection is claimed.
+## A10 advancement
 
-The Android guest is intended to use a **separate, app-private virtual disk**, computer name `YARDOMOB`, and a distinct emulated Ethernet MAC. It is a local x86 virtual computer—not VNC, screen sharing, or a remote session of the Mac guest.
+A10 replaces image/config/ready-marker `File.renameTo` publication with
+same-directory `Files.createLink` no-replace publication. Host tests exercise a
+second writer and a destination appearing mid-import. This is a guardrail for
+cooperating instances, not a substitute for native disk leases or Android
+hardware validation. Full engineering details: `docs/A10_ENGINEERING_RESULTS.md`.
 
-### Source upload
+### Host tests (no Mac)
 
-This repository has been initialized. The cumulative A10 Android source package should be committed to this repository before starting any GitHub Actions build. **Do not trigger an Android build until the complete source tree, including the `scripts/`, `overlay/`, `android/`, `host-tests/`, and `.github/workflows/` directories, has been uploaded and host tests pass.**
+```bash
+bash scripts/RUN_A10_HOST_TESTS.sh
+```
 
-Current Mac release candidate and working guests are independent; do not upload or modify Mac RC24.3, `YARDO`, `YARDO-B`, their hard disks, or their backups as part of Android development.
+### GitHub publishing (one-shot, Android Termux or Linux; no Mac test)
 
-## Distribution rules
+The **public** repository is https://github.com/crunchradio81/WinKit. It was
+initialized with a status README, but the A10 source has **not yet been pushed**
+by this package. From the extracted package, with GitHub credentials already
+configured for git operations, run:
 
-No Microsoft DOS/Windows installation images, licensed guest-disk exports, private backup images, secrets, signed Android keystores, or third-party binaries of uncertain redistribution status should be committed. `*.raw`, `*.img`, `*.iso`, `*.vhd`, `*.apk`, and signing files must remain outside the repository.
+```bash
+bash scripts/PUBLISH_A10_GITHUB.sh
+```
 
-A Linux CI build is a compiler/packaging gate only. It does not demonstrate working Android emulation or LAN interoperability.
+This will create and push a `android-a10-source` branch **without merging it**.
+Inspect and review the proposed PR before deciding whether to merge. The
+uploader rejects guest disk images and binary media from the staged Git index.
+
+### Linux x86_64 Android toolchain attempt
+
+Only *after* the entire source tree has been pushed, the manual workflow
+`.github/workflows/a10-android-arm64.yml` can attempt compilation and packaging
+using Android SDK/NDK, pinned DOSBox-X/Retro-DOS, and SDL3. Alternatively:
+
+```bash
+bash scripts/BUILD_A10_ANDROID.sh
+```
+
+This environment cannot run the Android toolchain. Even a successfully built
+APK is **not** evidence of an Android device boot.
+
+## Safety and distribution
+
+No Microsoft DOS/Windows media, installed virtual HDD, Mac guest disk, Mac
+backup, private network credentials, or signing keys are included. The PoC1
+Kotlin test JAR is no longer bundled: it is recreated locally during the tests.
+Mac RC24.3, YARDO and YARDO-B remain untouched.

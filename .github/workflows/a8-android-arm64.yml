@@ -1,0 +1,75 @@
+name: WinKit A8 Android ARM64 Build (device unverified)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android-arm64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      ANDROID_API: '28'
+      ANDROID_ABI: arm64-v8a
+    steps:
+      - name: Checkout A8 source
+        uses: actions/checkout@v4
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Linux and Android prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake libtool build-essential cmake ninja-build pkg-config python3 zip unzip curl binutils
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install 'ndk;28.2.13676358' 'platforms;android-36' 'build-tools;36.0.0'
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+      - name: Pin host Kotlin compiler 2.0.21
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/winkit-kotlin"
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/winkit-kotlin/compiler.zip" \
+            https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip
+          unzip -q "$RUNNER_TEMP/winkit-kotlin/compiler.zip" -d "$RUNNER_TEMP/winkit-kotlin"
+          echo "$RUNNER_TEMP/winkit-kotlin/kotlinc/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/winkit-kotlin/kotlinc/bin/kotlinc" -version
+          sha256sum "$RUNNER_TEMP/winkit-kotlin/compiler.zip" > kotlin-compiler-sha256.txt
+      - name: A8 host gates + native/Gradle build attempt
+        shell: bash
+        run: |
+          bash scripts/BUILD_A8_ANDROID.sh 2>&1 | tee a8-android-build.log
+      - name: Upload diagnostic logs (including failed builds)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinKit311-A8-Android-Build-Logs
+          path: |
+            a8-android-build.log
+            kotlin-compiler-sha256.txt
+            _external/Retro-Dosbox/android/build/tree-arm64-v8a/config.log
+            _external/Retro-Dosbox/android/build/arm64-v8a/sdl3-build/CMakeCache.txt
+            _external/Retro-Dosbox/android/build/arm64-v8a/sdl3-build/CMakeFiles/CMakeConfigureLog.yaml
+            _external/Retro-Dosbox/android/app/build/reports/
+            _external/Retro-Dosbox/android/app/build/outputs/logs/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload APK only after full package checks
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinKit311-A8-Android-ARM64-DEVICE-UNVERIFIED
+          path: |
+            _build_outputs/WinKit311-Android-A8-debug-DEVICE-UNVERIFIED.apk
+            _build_outputs/A8-BUILD-SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14

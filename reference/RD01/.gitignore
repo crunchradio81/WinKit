@@ -1,0 +1,28 @@
+# Never commit licensed operating system images, guest media, private exports,
+# secrets, machine identities, device logs or build outputs.
+*.raw
+*.img
+*.ima
+*.dsk
+*.vhd
+*.vdi
+*.qcow2
+*.iso
+*.cue
+*.bin
+*.zip
+*.7z
+*.apk
+*.aab
+*.keystore
+*.jks
+*.p12
+*.sf2
+*token*
+*secret*
+AndroidExports/
+GuestMedia/
+__pycache__/
+*.pyc
+.gradle/
+build/

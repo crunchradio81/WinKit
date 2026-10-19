@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.22)
+project(winkit_disk LANGUAGES CXX)
+add_library(winkit_disk SHARED disk_image.cpp native_disk_jni.cpp)
+target_compile_features(winkit_disk PRIVATE cxx_std_17)
+target_compile_options(winkit_disk PRIVATE -Wall -Wextra -Werror)
