@@ -23,8 +23,14 @@ class Integration(unittest.TestCase):
         s=(ROOT/'overlay/kotlin/OfflineSmokeFixture.kt').read_text()
         self.assertIn('"machines"',s)
         self.assertIn('none { it.exists()',s)
-        self.assertIn('stagedMarker.renameTo(marker)',s)
-        self.assertLess(s.index('if (!stage.renameTo(image))'),s.index('if (!stagedMarker.renameTo(marker))'))
+        self.assertIn('Files.createLink(image.toPath(), stage.toPath())',s)
+        self.assertIn('Files.createLink(config.toPath(), stagedConf.toPath())',s)
+        self.assertIn('Files.createLink(marker.toPath(), stagedMarker.toPath())',s)
+        self.assertNotIn('.renameTo(',s)
+        self.assertLess(s.index('Files.createLink(image.toPath(), stage.toPath())'),
+                        s.index('Files.createLink(config.toPath(), stagedConf.toPath())'))
+        self.assertLess(s.index('Files.createLink(config.toPath(), stagedConf.toPath())'),
+                        s.index('Files.createLink(marker.toPath(), stagedMarker.toPath())'))
     def test_artifact_media_absent(self):
         banned={'.img','.raw','.iso','.vhd','.vhdx','.vfd','.ima','.qcow2','.vdi','.vmdk'}
         actual=[str(p.relative_to(ROOT)) for p in ROOT.rglob('*') if p.is_file() and p.suffix.lower() in banned]
