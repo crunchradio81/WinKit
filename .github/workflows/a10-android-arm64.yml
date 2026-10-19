@@ -32,8 +32,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Android SDK (current command-line tools)
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
       - name: Install Linux and Android prerequisites
         shell: bash
         run: |
