@@ -11,8 +11,18 @@ jobs:
       ANDROID_API: '28'
       ANDROID_ABI: arm64-v8a
     steps:
-      - name: Checkout A10 source
+      - name: Checkout A10 source (independent development branch)
         uses: actions/checkout@v4
+        with:
+          ref: android-a10-source
+      - name: Verify Android source branch and build entry point
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = android-a10-source
+          test -f scripts/BUILD_A10_ANDROID.sh
+          test -f MANIFEST.sha256
+          echo "Compiling source from: $(git rev-parse HEAD) (android-a10-source)"
       - name: Java 17
         uses: actions/setup-java@v4
         with:
