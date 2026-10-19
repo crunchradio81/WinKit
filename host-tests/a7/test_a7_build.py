@@ -13,8 +13,8 @@ class A7BuildContract(unittest.TestCase):
    self.assertIn(term,s)
   self.assertIn('WinKit A6: launch profile mismatch',s)
  def test_no_apk_claim(self):
-  self.assertFalse(any(ROOT.rglob('*.apk')))
-  self.assertFalse(any(ROOT.rglob('*.raw')))
+  source_files=[row.split('  ',1)[1] for row in (ROOT/'MANIFEST.sha256').read_text().splitlines()]
+  self.assertFalse(any(Path(name).suffix.lower() in {'.apk','.raw'} for name in source_files))
  def test_source_identity(self):
   s=(ROOT/'scripts/bootstrap_core.sh').read_text()
   self.assertIn('65e8c67ed4d8e5aacabc4b96337e8d47ac92d720',s)

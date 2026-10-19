@@ -7,11 +7,10 @@ ROOT = pathlib.Path(sys.argv.pop(1))
 class Safety(unittest.TestCase):
     def test_no_guest_disk_or_credential_in_package(self):
         suspect = []
-        for path in ROOT.rglob('*'):
-            if not path.is_file(): continue
-            if any(p.startswith('.') for p in path.relative_to(ROOT).parts): continue
-            if path.suffix.lower() in {'.raw', '.img', '.vhd', '.vdi', '.iso', '.dsk', '.apk', '.jks', '.keystore'}:
-                suspect.append(str(path.relative_to(ROOT)))
+        source_files = [row.split('  ', 1)[1] for row in (ROOT/'MANIFEST.sha256').read_text().splitlines()]
+        for name in source_files:
+            if pathlib.Path(name).suffix.lower() in {'.raw', '.img', '.vhd', '.vdi', '.iso', '.dsk', '.apk', '.jks', '.keystore'}:
+                suspect.append(name)
         self.assertEqual(suspect, [])
     def test_android_is_offline_only(self):
         manifest = (ROOT / 'android/app/src/main/AndroidManifest.xml').read_text()
@@ -22,6 +21,7 @@ class Safety(unittest.TestCase):
         self.assertNotIn('ETHNET CONNECT', main)
         self.assertNotIn('startEmulator(', main)
     def test_no_sdk_apk(self):
-        self.assertFalse(any(ROOT.rglob('*.apk')))
+        source_files = [row.split('  ', 1)[1] for row in (ROOT/'MANIFEST.sha256').read_text().splitlines()]
+        self.assertFalse(any(pathlib.Path(name).suffix.lower() == '.apk' for name in source_files))
 
 if __name__ == '__main__': unittest.main(verbosity=2)

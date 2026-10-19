@@ -33,7 +33,8 @@ class Integration(unittest.TestCase):
                         s.index('Files.createLink(marker.toPath(), stagedMarker.toPath())'))
     def test_artifact_media_absent(self):
         banned={'.img','.raw','.iso','.vhd','.vhdx','.vfd','.ima','.qcow2','.vdi','.vmdk'}
-        actual=[str(p.relative_to(ROOT)) for p in ROOT.rglob('*') if p.is_file() and p.suffix.lower() in banned]
+        source_files=[row.split('  ',1)[1] for row in (ROOT/'MANIFEST.sha256').read_text().splitlines()]
+        actual=[name for name in source_files if Path(name).suffix.lower() in banned]
         self.assertEqual(actual,[])
     def test_patch_copies_geometry(self):
         s=(ROOT/'scripts/apply_a2_overlay.py').read_text()

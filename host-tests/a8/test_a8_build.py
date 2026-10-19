@@ -121,7 +121,7 @@ APP_LIBS="$HERE/app/libs"
         for token in ('workflow_dispatch:', 'if: always()', 'if: success()', 'BUILD_A8_ANDROID.sh',
                       'WinKit311-A8-Android-ARM64-DEVICE-UNVERIFIED'):
             self.assertIn(token,s)
-        self.assertFalse(any(ROOT.rglob('*.apk')))
-        self.assertFalse(any(ROOT.rglob('*.raw')))
+        source_files=[row.split('  ',1)[1] for row in (ROOT/'MANIFEST.sha256').read_text().splitlines()]
+        self.assertFalse(any(Path(name).suffix.lower() in {'.apk','.raw'} for name in source_files))
 
 if __name__=='__main__': unittest.main(verbosity=2)

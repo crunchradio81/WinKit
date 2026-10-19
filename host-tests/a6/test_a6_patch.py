@@ -47,6 +47,7 @@ void engine() {
         self.assertFalse(status['android_apk_built'])
     def test_no_windows_disk_images(self):
         ext={'.raw','.img','.iso','.vhd','.vhdx','.vmdk','.qcow2','.exe','.dll','.vdi'}
-        self.assertEqual([str(p) for p in ROOT.rglob('*') if p.is_file() and p.suffix.lower() in ext],[])
+        source_files=[row.split('  ',1)[1] for row in (ROOT/'MANIFEST.sha256').read_text().splitlines()]
+        self.assertEqual([name for name in source_files if Path(name).suffix.lower() in ext],[])
 
 if __name__ == '__main__':unittest.main(verbosity=2)

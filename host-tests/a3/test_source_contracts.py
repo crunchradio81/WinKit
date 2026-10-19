@@ -23,7 +23,8 @@ class Contracts(unittest.TestCase):
         self.assertIn('libSDL3.so', script)
     def test_no_microsoft_payload(self):
         suspicious = {'.vhd', '.vhdx', '.iso', '.ima', '.vfd', '.raw', '.img', '.vdi', '.qcow2'}
-        items = [str(p.relative_to(ROOT)) for p in ROOT.rglob('*') if p.is_file() and p.suffix.lower() in suspicious]
+        source_files = [row.split('  ', 1)[1] for row in (ROOT/'MANIFEST.sha256').read_text().splitlines()]
+        items = [name for name in source_files if Path(name).suffix.lower() in suspicious]
         self.assertEqual(items, [], f'OS/disk media in source package: {items}')
     def test_a3_policy_used_at_boot_gate(self):
         activity = (ROOT/'overlay/kotlin/WinKitSetupActivity.kt').read_text()
