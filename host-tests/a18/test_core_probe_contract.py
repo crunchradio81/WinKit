@@ -21,6 +21,15 @@ int dosbox_x_engine_main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {
             sdl.inited = true;
         else
             E_Exit("Can't init SDL %s",SDL_GetError());
+        /* -- -- other steps to prepare SDL window/output */
+        SDL_Prepare();
+        /* -- -- Keyboard layout detection and setup */
+        KeyboardLayoutDetect();
+        SetMapperKeyboardLayout(host_keyboard_layout);
+        LOG(LOG_MISC,LOG_DEBUG)("Initializing SDL joystick subsystem...");
+        /* GUI init */
+        GUI_StartUp();
+        AllocCallback1();
         /* Start up main machine */
         MAPPER_StartUp();
         DOSBOX_InitTickLoop();
@@ -42,6 +51,8 @@ for fn, source, milestones in (
     for n in milestones:
         assert f"WinKit A18 stage {n}:" in modified, n
     if fn == p.patch_core_sdlmain:
+        for stage in "ABCDEFGHI":
+            assert f"WinKit A21 stage 26{stage}:" in modified, stage
         assert 'WinKit A20 stage 20A: DOSBox-X wrapper entered' in modified
         assert '#error "WinKit Android must compile the embedded DOSBox-X entry"' in modified
     try: fn(modified)
@@ -63,9 +74,9 @@ activity=(root/"overlay/kotlin/WinKitSetupActivity.kt").read_text()
 assert 'Selected document provider returned no writable stream' in activity
 assert 'Could not open save destination' not in activity
 assert 'Diagnostic export failed (' in activity
-assert 'const val UI_RELEASE = "A20"' in activity
-assert 'WinKit-A20-startup-diagnostics.zip' in activity
-assert 'WinKit A20 startup diagnostics (A18 core probes)' in activity
+assert 'const val UI_RELEASE = "A21"' in activity
+assert 'WinKit-A21-startup-diagnostics.zip' in activity
+assert 'WinKit A21 startup diagnostics (A21 SDL preparation probes)' in activity
 assert 'setOnApplyWindowInsetsListener' in activity
 assert 'button.isAllCaps = false' in activity
 assert 'button.setSingleLine(false)' in activity
@@ -82,4 +93,4 @@ assert 'CXXFLAGS="-fPIC -O2 -g0 -DANDROID -DRETRODOS_HOST_PROVIDES_MAIN"' in bui
 build_recipe=(root/"scripts/BUILD_A10_ANDROID.sh").read_text()
 assert "WinKit A20 stage 20A: DOSBox-X wrapper entered" in build_recipe
 assert "WinKit A18 stage 21: engine main entered" in build_recipe
-print("PASS A20 embedded Android core entry flags, checkpoints and APK gate")
+print("PASS A21 SDL startup checkpoints, Android entry flags and diagnostics")

@@ -290,6 +290,46 @@ def patch_core_sdlmain(data: str) -> str:
         '        else\n            E_Exit("Can\'t init SDL %s",SDL_GetError());\n'
         '        WK_A18_CORE("WinKit A18 stage 26: SDL initialized");',
         'A18 SDL complete')
+    # A21: instrument the region after SDL_Init and before machine startup.
+    # Each anchor is pinned to one exact upstream statement; do not move SDL
+    # calls to a different thread or change the emulated disk at this stage.
+    data = replace_exact(data,
+        '        /* -- -- other steps to prepare SDL window/output */\n'
+        '        SDL_Prepare();',
+        '        /* -- -- other steps to prepare SDL window/output */\n'
+        '        WK_A18_CORE("WinKit A21 stage 26A: before SDL_Prepare");\n'
+        '        SDL_Prepare();\n'
+        '        WK_A18_CORE("WinKit A21 stage 26B: SDL_Prepare returned");',
+        'A21 SDL_Prepare')
+    data = replace_exact(data,
+        '        /* -- -- Keyboard layout detection and setup */\n'
+        '        KeyboardLayoutDetect();\n'
+        '        SetMapperKeyboardLayout(host_keyboard_layout);',
+        '        /* -- -- Keyboard layout detection and setup */\n'
+        '        WK_A18_CORE("WinKit A21 stage 26C: before keyboard setup");\n'
+        '        KeyboardLayoutDetect();\n'
+        '        SetMapperKeyboardLayout(host_keyboard_layout);\n'
+        '        WK_A18_CORE("WinKit A21 stage 26D: keyboard setup returned");',
+        'A21 keyboard')
+    data = replace_exact(data,
+        '        LOG(LOG_MISC,LOG_DEBUG)("Initializing SDL joystick subsystem...");',
+        '        WK_A18_CORE("WinKit A21 stage 26E: before joystick init");\n'
+        '        LOG(LOG_MISC,LOG_DEBUG)("Initializing SDL joystick subsystem...");',
+        'A21 joystick start')
+    data = replace_exact(data,
+        '        /* GUI init */\n'
+        '        GUI_StartUp();',
+        '        /* GUI init */\n'
+        '        WK_A18_CORE("WinKit A21 stage 26F: before GUI_StartUp");\n'
+        '        GUI_StartUp();\n'
+        '        WK_A18_CORE("WinKit A21 stage 26G: GUI_StartUp returned");',
+        'A21 GUI startup')
+    data = replace_exact(data,
+        '        AllocCallback1();',
+        '        WK_A18_CORE("WinKit A21 stage 26H: before AllocCallback1");\n'
+        '        AllocCallback1();\n'
+        '        WK_A18_CORE("WinKit A21 stage 26I: AllocCallback1 returned");',
+        'A21 callback')
     data = replace_exact(data,
         '        /* Start up main machine */',
         '        WK_A18_CORE("WinKit A18 stage 27: starting machine");\n'
