@@ -129,7 +129,35 @@ def patch_frontend(data: str) -> str:
 #endif
     char a0[]'''
     data = replace_exact(data, old_floppy_guard, new_floppy_guard, 'WinKit floppy exclusion')
-    return replace_exact(data, engine_anchor, engine_with_lease, 'engine lease')
+    data = replace_exact(data, engine_anchor, engine_with_lease, 'engine lease')
+    # The WinKit SetupActivity has already installed and approved the separate
+    # app-private disk before MainActivity starts. The generic Retro-DOS wizard
+    # is for choosing a games folder and should never intercept that boot.
+    # Launch only the EXACT native-validated WinKit entry produced by refresh().
+    autostart = '''#if defined(__ANDROID__)
+    // WinKit A12: enter the independently validated offline machine directly.
+    // Do not bypass the A3 image lease, A6 launch-profile gate or renderer.
+    // The sole trusted library entry appears only after OFFLINE_READY,
+    // raw-disk geometry and disabled-network config are verified.
+    if (cfg.pending_launch.empty()) {
+        for (const Game &candidate : games) {
+            if (candidate.is_machine &&
+                candidate.name == "WinKit 3.11 - YARDOMOB (OFFLINE)" &&
+                candidate.dir == cfg_dir + "/machines" &&
+                !candidate.conf_override.empty()) {
+                launch(candidate);
+                break;
+            }
+        }
+    }
+#endif
+
+'''
+    return replace_exact(
+        data,
+        '    /* ---- Opening straight onto one screen, for the store captures --------',
+        autostart + '    /* ---- Opening straight onto one screen, for the store captures --------',
+        'WinKit A12 launch after lambda')
 
 
 def patch_manifest(data: str) -> str:

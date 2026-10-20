@@ -22,6 +22,7 @@ void foo() {
     refresh();
 
     enum class View { Emulator };
+    /* ---- Opening straight onto one screen, for the store captures --------
         if (!g.conf_override.empty()) {
             /* A machine's conf is its own, but the floppy drives on the
         }
@@ -51,6 +52,13 @@ class TestPatch(unittest.TestCase):
         self.assertIn('WinKit 3.11 - YARDOMOB (OFFLINE)',s)
         self.assertIn('SDL_GetAndroidInternalStoragePath()',s)
         self.assertEqual(s.count('games.push_back(std::move(w))'),1)
+        self.assertIn('WinKit A12: enter the independently validated offline machine directly.',s)
+        self.assertIn('candidate.is_machine',s)
+        self.assertIn('candidate.dir == cfg_dir + "/machines"',s)
+        self.assertIn('cfg.pending_launch.empty()',s)
+        self.assertIn('launch(candidate);',s)
+        self.assertNotIn('cfg.wizard_done = true;',s)
+        self.assertLess(s.index('auto launch =') if 'auto launch =' in s else 0, s.index('launch(candidate);'))
         with self.assertRaises(ValueError):p.patch_frontend(s)
     def test_manifest_security(self):
         s=p.patch_manifest(MANIFEST)
