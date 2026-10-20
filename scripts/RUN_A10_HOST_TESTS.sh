@@ -16,6 +16,7 @@ c++ -std=c++17 -Wall -Wextra -Werror -I"$ROOT/overlay/native" \
    "$ROOT/host-tests/a14/test_android_disk_alias.cpp" -o "$TEMP/a14-alias"
 "$TEMP/a14-alias"
 python3 "$ROOT/host-tests/a10/test_no_replace_contract.py"
+python3 "$ROOT/host-tests/a15/test_native_crash_export_contract.py"
 if [[ "${A10_SKIP_INHERITED:-0}" != 1 ]]; then
     A9_SKIP_INHERITED=1 bash "$ROOT/scripts/RUN_A9_HOST_TESTS.sh"
     python3 "$ROOT/host-tests/a8/test_a8_build.py"

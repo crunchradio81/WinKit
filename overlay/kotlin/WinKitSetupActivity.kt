@@ -1,6 +1,9 @@
 package com.crownparkcomputing.retrodos.winkit
 
 import android.app.Activity
+import android.app.ActivityManager
+import android.app.ApplicationExitInfo
+import android.os.Build
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
@@ -16,11 +19,13 @@ import com.crownparkcomputing.retrodos.MainActivity
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /** A2 source overlay: standalone source import + offline-only launch selector.
  * No real Ethernet, Tailscale sockets, Windows files or remote-desktop code. */
 class WinKitSetupActivity : Activity() {
-    private companion object { const val PICK_IMAGE = 0x3120; const val PICK_CONFIG = 0x3121 }
+    private companion object { const val PICK_IMAGE = 0x3120; const val PICK_CONFIG = 0x3121; const val EXPORT_NATIVE_CRASH = 0x3122 }
     private val mainThread = Handler(Looper.getMainLooper())
     private val workers = Executors.newSingleThreadExecutor()
     private val store by lazy { GuestStore(filesDir) }
@@ -47,8 +52,8 @@ class WinKitSetupActivity : Activity() {
             it.setPadding(0, 10, 0, 10)
             container.addView(it)
         }
-        label("WinKit 3.11 · A14 Android Path Alias Fix", 24f)
-        label("A14 verified-path gate: native boot and BIOS display remain UNVERIFIED.", 14f)
+        label("WinKit 3.11 · A15 Native Crash Diagnostics", 24f)
+        label("A15 private crash export enabled. BIOS boot remains UNVERIFIED.", 14f)
         val prefs = getSharedPreferences("winkit-machine-identity", MODE_PRIVATE)
         val proposedMac = prefs.getString("proposed_mac", null) ?: GuestIdentity.newLocalMac().also {
             prefs.edit().putString("proposed_mac", it).apply()
@@ -138,7 +143,24 @@ class WinKitSetupActivity : Activity() {
             }
             container.addView(it)
         }
-        status = label("A11 ARM64 APK compiled; standalone BIOS guest boot still UNVERIFIED.", 14f)
+        Button(this).also { export ->
+            export.text = "EXPORT LATEST WINKIT NATIVE CRASH REPORT"
+            export.setOnClickListener {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                    update("Native crash export requires Android 12 or later")
+                } else if (latestNativeExit() == null) {
+                    update("No WinKit native crash record available")
+                } else {
+                    startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "application/zip"
+                        putExtra(Intent.EXTRA_TITLE, "WinKit-A15-native-crash.zip")
+                    }, EXPORT_NATIVE_CRASH)
+                }
+            }
+            container.addView(export)
+        }
+        status = label("A15: native guest boot remains UNVERIFIED.", 14f)
         label("IMPORTANT: Copied Windows computer name may still be YARDO/YARDO-B. Rename it to YARDOMOB and verify the NIC MAC before ANY network test.", 14f)
         val scroll = ScrollView(this)
         scroll.addView(container)
@@ -158,6 +180,36 @@ class WinKitSetupActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != RESULT_OK) return
         val uri = data?.data ?: return
+        if (requestCode == EXPORT_NATIVE_CRASH) {
+            workers.execute {
+                val message = try {
+                    val exit = latestNativeExit() ?: error("Native crash no longer available")
+                    var hasTombstone = false
+                    contentResolver.openOutputStream(uri, "w")?.use { out ->
+                        ZipOutputStream(out).use { zip ->
+                            val summary = "WinKit A15 native crash evidence\n" +
+                                "Process: ${exit.processName}\n" +
+                                "Exit timestamp: ${exit.timestamp}\n" +
+                                "Reason: ${exit.reason}\n" +
+                                "Guest disk, offline config, NIC and network content are excluded.\n"
+                            zip.putNextEntry(ZipEntry("summary.txt"))
+                            zip.write(summary.toByteArray(StandardCharsets.UTF_8))
+                            zip.closeEntry()
+                            exit.traceInputStream?.use { trace ->
+                                zip.putNextEntry(ZipEntry("native-tombstone.pb"))
+                                trace.copyTo(zip)
+                                zip.closeEntry()
+                                hasTombstone = true
+                            }
+                        }
+                    } ?: error("Could not open save destination")
+                    if (hasTombstone) "WinKit native crash ZIP saved; no guest disk exported"
+                    else "Crash metadata saved, but Android did not retain its native tombstone"
+                } catch (e: Exception) { "Native crash export failed: ${e.message}" }
+                update(message)
+            }
+            return
+        }
         if (requestCode !in arrayOf(PICK_IMAGE, PICK_CONFIG)) return
         val sha = imageSha.text.toString().trim()
         val old = sourcePath.text.toString().trim()
@@ -227,6 +279,17 @@ class WinKitSetupActivity : Activity() {
             } catch (e: Exception) { "Rejected safely: ${e.message}" }
             mainThread.post { refresh(); update(message) }
         }
+    }
+
+    private fun latestNativeExit(): ApplicationExitInfo? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null
+        return try {
+            val manager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+            manager.getHistoricalProcessExitReasons(packageName, 0, 32)
+                .filter { it.processName == packageName &&
+                          it.reason == ApplicationExitInfo.REASON_CRASH_NATIVE }
+                .maxByOrNull { it.timestamp }
+        } catch (_: Exception) { null }
     }
 
     private fun isReady(): Boolean =

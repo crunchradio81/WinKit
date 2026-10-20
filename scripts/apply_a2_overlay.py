@@ -106,6 +106,7 @@ def patch_frontend(data: str) -> str:
     engine_anchor = '    retrodos_host_set_window(nullptr);\n\n    char a0[]'
     engine_with_lease = '''    retrodos_host_set_window(nullptr);
 #if defined(__ANDROID__)
+    SDL_Log("WinKit A15 stage 10: engine thread entered");
     const char *privateRoot = SDL_GetAndroidInternalStoragePath();
     const std::string machineRoot = privateRoot ? std::string(privateRoot) + "/machines" : "";
     if (!machineRoot.empty() && workdir == machineRoot) {
@@ -115,6 +116,7 @@ def patch_frontend(data: str) -> str:
             g_engine_done.store(true);
             return;
         }
+        SDL_Log("WinKit A15 stage 11: disk lease acquired");
         // Recheck after obtaining the disk lease, before starting guest code.
         // The frontend profile was loaded earlier and may be stale if files changed.
         // `conf` is a FILE PATH, never pass it as raw profile contents.
@@ -128,6 +130,7 @@ def patch_frontend(data: str) -> str:
             g_engine_done.store(true);
             return;
         }
+        SDL_Log("WinKit A15 stage 12: launch snapshot validated");
         // No separate emulation window: the existing SDL3 render thread owns it.
         char a0[] = "dosbox-x";
         char a1[] = "-conf";
@@ -136,7 +139,9 @@ def patch_frontend(data: str) -> str:
         std::vector<char> d(workdir.begin(), workdir.end()); d.push_back('\\0');
         char *argv[] = { a0, a1, c.data(), a3, d.data(), nullptr };
         retrodos_host_set_framebuffer_output(true);
+        SDL_Log("WinKit A15 stage 13: entering DOSBox-X core");
         retrodos_host_run(5, argv);
+        SDL_Log("WinKit A15 stage 14: DOSBox-X core returned");
         g_engine_done.store(true);
         return; // lease scope ends here, after core shutdown
     }
@@ -159,7 +164,9 @@ def patch_frontend(data: str) -> str:
                 candidate.name == "WinKit 3.11 - YARDOMOB (OFFLINE)" &&
                 candidate.dir == cfg_dir + "/machines" &&
                 !candidate.conf_override.empty()) {
+                SDL_Log("WinKit A15 stage 01: found validated YARDOMOB; calling launch");
                 launch(candidate);
+                SDL_Log("WinKit A15 stage 02: launch returned to frontend");
                 break;
             }
         }
