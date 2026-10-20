@@ -20,6 +20,27 @@ engine='''static void GUI_StartUp() {
     /* Get some Event handlers */
     const int display = section->Get_int("display");
     // output type selection
+    // FIXME: this selection of output is duplicated in change_output:
+    sdl.desktop.isperfect = false; /* Reset before selection */
+    if (output == "surface")
+        OUTPUT_SURFACE_Select();
+    else if (output == "gamelink")
+    {
+        OUTPUT_GAMELINK_Select();
+    }
+    sdl.overscan_width=(unsigned int)section->Get_int("overscan");
+    /* Initialize screen for first time */
+    if (!initgl && sdl.desktop.want_type == SCREEN_GAMELINK && retrodos_host_embedded()) {
+        sdl.window  = (SDL_Window *)retrodos_host_window();
+        sdl.surface = SDL_CreateSurface(640, 400, SDL_PIXELFORMAT_XRGB8888);
+        if (sdl.surface == NULL)
+            E_Exit("Could not create the offscreen surface: %s", SDL_GetError());
+    }
+    sdl.desktop.pixelFormat = SDL_GetWindowPixelFormat(sdl.window);
+    LOG_MSG("SDL: Current window pixel format: %s", SDL_GetPixelFormatName((SDL_PixelFormat)sdl.desktop.pixelFormat));
+    GFX_LogSDLState();
+    GFX_Stop();
+    SDL_SetWindowTitle(sdl.window,"DOSBox-X");
     SetWindowTransparency(section->Get_int("transparency"));
     UpdateWindowDimensions();
     ApplyPreventCap();
@@ -68,6 +89,8 @@ for fn, source, milestones in (
             assert f"WinKit A21 stage 26{stage}:" in modified, stage
         for stage in range(40, 52):
             assert f"WinKit A22 stage {stage}:" in modified, stage
+        for stage in range(52, 67):
+            assert f"WinKit A23 stage {stage}:" in modified, stage
         assert '#define WK_A22_GUI(s) winkit_a18_core_checkpoint(s)' in modified
         assert 'WinKit A20 stage 20A: DOSBox-X wrapper entered' in modified
         assert '#error "WinKit Android must compile the embedded DOSBox-X entry"' in modified
@@ -90,9 +113,9 @@ activity=(root/"overlay/kotlin/WinKitSetupActivity.kt").read_text()
 assert 'Selected document provider returned no writable stream' in activity
 assert 'Could not open save destination' not in activity
 assert 'Diagnostic export failed (' in activity
-assert 'const val UI_RELEASE = "A22"' in activity
-assert 'WinKit-A22-startup-diagnostics.zip' in activity
-assert 'WinKit A22 startup diagnostics (GUI_StartUp probes)' in activity
+assert 'const val UI_RELEASE = "A23"' in activity
+assert 'WinKit-A23-startup-diagnostics.zip' in activity
+assert 'WinKit A23 startup diagnostics (Game Link and video probes)' in activity
 assert 'setOnApplyWindowInsetsListener' in activity
 assert 'button.isAllCaps = false' in activity
 assert 'button.setSingleLine(false)' in activity
@@ -109,4 +132,4 @@ assert 'CXXFLAGS="-fPIC -O2 -g0 -DANDROID -DRETRODOS_HOST_PROVIDES_MAIN"' in bui
 build_recipe=(root/"scripts/BUILD_A10_ANDROID.sh").read_text()
 assert "WinKit A20 stage 20A: DOSBox-X wrapper entered" in build_recipe
 assert "WinKit A18 stage 21: engine main entered" in build_recipe
-print("PASS A22 GUI startup checkpoints, SDL preparation, Android entry flags and diagnostics")
+print("PASS A23 Game Link and graphics startup probes, Android entry and diagnostics")

@@ -400,6 +400,68 @@ def patch_core_sdlmain(data: str) -> str:
     data = replace_exact(data,'            DOSBOX_RunMachine();',
         '            WK_A18_CORE("WinKit A18 stage 30: CPU loop entered");\n'
         '            DOSBOX_RunMachine();','A18 CPU loop')
+    # A23: isolate Game Link output, borrowed SDL window and video setup.
+    # Keep upstream video behavior unchanged while locating the fault.
+    data = replace_exact(data,
+        '    // FIXME: this selection of output is duplicated in change_output:',
+        '    WK_A22_GUI("WinKit A23 stage 52: output normalized");\n    // FIXME: this selection of output is duplicated in change_output:',
+        'A23 52: output normalized')
+    data = replace_exact(data,
+        '    sdl.desktop.isperfect = false; /* Reset before selection */\n    if (output == "surface")',
+        '    WK_A22_GUI("WinKit A23 stage 53: entering output selector");\n    sdl.desktop.isperfect = false; /* Reset before selection */\n    if (output == "surface")',
+        'A23 53: entering output selector')
+    data = replace_exact(data,
+        '    else if (output == "gamelink")\n    {\n        OUTPUT_GAMELINK_Select();',
+        '    WK_A22_GUI("WinKit A23 stage 54: selecting Game Link");\n    else if (output == "gamelink")\n    {\n        OUTPUT_GAMELINK_Select();',
+        'A23 54: selecting Game Link')
+    data = replace_exact(data,
+        '    sdl.overscan_width=(unsigned int)section->Get_int("overscan");',
+        '    WK_A22_GUI("WinKit A23 stage 56: output selector returned");\n    sdl.overscan_width=(unsigned int)section->Get_int("overscan");',
+        'A23 56: output selector returned')
+    data = replace_exact(data,
+        '/* Initialize screen for first time */',
+        '    WK_A22_GUI("WinKit A23 stage 57: before window initialization");\n/* Initialize screen for first time */',
+        'A23 57: before window initialization')
+    data = replace_exact(data,
+        '        sdl.window  = (SDL_Window *)retrodos_host_window();',
+        '    WK_A22_GUI("WinKit A23 stage 58: before borrowed window adoption");\n        sdl.window  = (SDL_Window *)retrodos_host_window();',
+        'A23 58: before borrowed window adoption')
+    data = replace_exact(data,
+        '        sdl.surface = SDL_CreateSurface(640, 400, SDL_PIXELFORMAT_XRGB8888);',
+        '    WK_A22_GUI("WinKit A23 stage 59: borrowed window adopted");\n        sdl.surface = SDL_CreateSurface(640, 400, SDL_PIXELFORMAT_XRGB8888);',
+        'A23 59: borrowed window adopted')
+    data = replace_exact(data,
+        '        if (sdl.surface == NULL)\n            E_Exit("Could not create the offscreen surface: %s", SDL_GetError());',
+        '    WK_A22_GUI("WinKit A23 stage 60: offscreen surface created");\n        if (sdl.surface == NULL)\n            E_Exit("Could not create the offscreen surface: %s", SDL_GetError());',
+        'A23 60: offscreen surface created')
+    data = replace_exact(data,
+        '    sdl.desktop.pixelFormat = SDL_GetWindowPixelFormat(sdl.window);',
+        '    WK_A22_GUI("WinKit A23 stage 61: before window pixel format");\n    sdl.desktop.pixelFormat = SDL_GetWindowPixelFormat(sdl.window);',
+        'A23 61: before window pixel format')
+    data = replace_exact(data,
+        '    LOG_MSG("SDL: Current window pixel format: %s", SDL_GetPixelFormatName((SDL_PixelFormat)sdl.desktop.pixelFormat));',
+        '    WK_A22_GUI("WinKit A23 stage 62: window pixel format returned");\n    LOG_MSG("SDL: Current window pixel format: %s", SDL_GetPixelFormatName((SDL_PixelFormat)sdl.desktop.pixelFormat));',
+        'A23 62: window pixel format returned')
+    data = replace_exact(data,
+        '    GFX_LogSDLState();\n    GFX_Stop();',
+        '    WK_A22_GUI("WinKit A23 stage 63: before graphics state check");\n    GFX_LogSDLState();\n    GFX_Stop();',
+        'A23 63: before graphics state check')
+    data = replace_exact(data,
+        '    SDL_SetWindowTitle(sdl.window,"DOSBox-X");',
+        '    WK_A22_GUI("WinKit A23 stage 65: before window title");\n    SDL_SetWindowTitle(sdl.window,"DOSBox-X");',
+        'A23 65: before window title')
+    data = replace_exact(data,
+        '        OUTPUT_GAMELINK_Select();',
+        '        OUTPUT_GAMELINK_Select();\n        WK_A22_GUI("WinKit A23 stage 55: Game Link selector returned");',
+        'A23 Game Link returned')
+    data = replace_exact(data,
+        '    GFX_LogSDLState();\n    GFX_Stop();',
+        '    GFX_LogSDLState();\n    GFX_Stop();\n    WK_A22_GUI("WinKit A23 stage 64: GFX_Stop returned");',
+        'A23 graphics returned')
+    data = replace_exact(data,
+        '    SDL_SetWindowTitle(sdl.window,"DOSBox-X");',
+        '    SDL_SetWindowTitle(sdl.window,"DOSBox-X");\n    WK_A22_GUI("WinKit A23 stage 66: SDL window title returned");',
+        'A23 window title returned')
     # A20: the exported entry wrapper is the gap between stages 20 and 21.
     # Block Android builds that would silently compile out the engine probes.
     return replace_exact(data,
