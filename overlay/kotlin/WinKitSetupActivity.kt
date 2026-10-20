@@ -8,6 +8,9 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.TypedValue
+import android.view.Gravity
+import android.view.WindowInsets
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.CheckBox
@@ -25,7 +28,7 @@ import java.util.zip.ZipOutputStream
 /** A2 source overlay: standalone source import + offline-only launch selector.
  * No real Ethernet, Tailscale sockets, Windows files or remote-desktop code. */
 class WinKitSetupActivity : Activity() {
-    private companion object { const val PICK_IMAGE = 0x3120; const val PICK_CONFIG = 0x3121; const val EXPORT_NATIVE_CRASH = 0x3122 }
+    private companion object { const val PICK_IMAGE = 0x3120; const val PICK_CONFIG = 0x3121; const val EXPORT_NATIVE_CRASH = 0x3122; const val UI_RELEASE = "A19" }
     private val mainThread = Handler(Looper.getMainLooper())
     private val workers = Executors.newSingleThreadExecutor()
     private val store by lazy { GuestStore(filesDir) }
@@ -43,28 +46,47 @@ class WinKitSetupActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val density = resources.displayMetrics.density
+        fun dp(value: Int) = (value * density + 0.5f).toInt()
+        val colors = obtainStyledAttributes(intArrayOf(android.R.attr.textColorPrimary))
+        val bodyColor = colors.getColor(0, android.graphics.Color.BLACK)
+        colors.recycle()
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 24, 32, 24)
+            setPadding(dp(18), dp(12), dp(18), dp(20))
         }
         fun label(message: String, size: Float = 16f) = TextView(this).also {
             it.text = message
             it.textSize = size
-            it.setPadding(0, 10, 0, 10)
-            container.addView(it)
+            it.setTextColor(bodyColor)
+            it.setPadding(0, dp(8), 0, dp(8))
+            it.setLineSpacing(dp(2).toFloat(), 1f)
+            if (size >= 20f) it.setTypeface(null, android.graphics.Typeface.BOLD)
+            container.addView(it, LinearLayout.LayoutParams(-1, -2))
         }
-        label("WinKit 3.11 · A18 Core Startup Diagnostics", 24f)
-        label("A18 core startup checkpoints enabled. BIOS boot remains UNVERIFIED.", 14f)
+        fun addAction(button: Button) {
+            button.isAllCaps = false
+            button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            button.setSingleLine(false)
+            button.gravity = Gravity.CENTER
+            button.setPadding(dp(12), dp(10), dp(12), dp(10))
+            button.setMinimumHeight(dp(52))
+            val layout = LinearLayout.LayoutParams(-1, -2)
+            layout.bottomMargin = dp(8)
+            container.addView(button, layout)
+        }
+        label("WinKit 3.11 Android · $UI_RELEASE", 23f)
+        label("A18 native core checkpoints enabled. Guest boot is not yet verified.", 14f)
         val prefs = getSharedPreferences("winkit-machine-identity", MODE_PRIVATE)
         val proposedMac = prefs.getString("proposed_mac", null) ?: GuestIdentity.newLocalMac().also {
             prefs.edit().putString("proposed_mac", it).apply()
         }
         label("Machine: YARDOMOB | proposed NIC MAC: $proposedMac (NOT installed into emulated NIC)", 14f)
         label("DOS 6.22 / Windows for Workgroups 3.11 on THIS device. No VNC or Mac remote desktop.")
-        label("A2 requires a stopped independent image and its real Mac DOSBox-X configuration. Neither is included.", 14f)
+        label("Import a private disk and its DOSBox-X configuration, or try the standalone GPL BIOS smoke-test disk.", 14f)
         label("Step 1 · Paste SHA-256 from your private export manifest")
         imageSha = EditText(this).also {
-            it.hint = "64 hexadecimal characters from manifest.json"
+            it.hint = "SHA-256 from manifest (64 hex digits)"
             it.setSingleLine(true)
             container.addView(it, ViewGroup.LayoutParams(-1, -2))
         }
@@ -75,11 +97,11 @@ class WinKitSetupActivity : Activity() {
                     update("Image SHA-256 must have 64 hex characters")
                 } else pick(PICK_IMAGE)
             }
-            container.addView(it)
+            addAction(it)
         }
         // Test the real Android emulator path without Mac exports or Microsoft media.
         Button(this).also { diagnostic ->
-            diagnostic.text = "Install GPL BIOS boot smoke test (NO DOS/Windows)"
+            diagnostic.text = "Install GPL BIOS smoke test (no DOS/Windows)"
             diagnostic.setOnClickListener {
                 if (store.installedImage().exists() || offlineConf.exists() || ready.exists()) {
                     update("A machine already exists. Synthetic test will not overwrite any guest disk.")
@@ -100,7 +122,7 @@ class WinKitSetupActivity : Activity() {
                     mainThread.post { diagnostic.isEnabled = !store.installedImage().exists(); refresh(); update(message) }
                 }
             }
-            container.addView(diagnostic)
+            addAction(diagnostic)
         }
         label("Step 2 · Enter the EXACT original absolute Mac image path from [autoexec] IMGMOUNT")
         sourcePath = EditText(this).also {
@@ -109,17 +131,17 @@ class WinKitSetupActivity : Activity() {
             container.addView(it, ViewGroup.LayoutParams(-1, -2))
         }
         config = Button(this).also {
-            it.text = "Import working DOSBox-X .conf (offline conversion)"
+            it.text = "Import DOSBox-X configuration (offline)"
             it.setOnClickListener {
                 if (!store.installedImage().isFile) update("Import the verified disk first")
                 else if (sourcePath.text.toString().isBlank()) update("Enter exact source disk path")
                 else pick(PICK_CONFIG)
             }
-            container.addView(it)
+            addAction(it)
         }
         label("Step 3 · Inspect and acknowledge the generated config. Virtual NE2000 and IPX are disabled.", 14f)
         Button(this).also {
-            it.text = "Inspect generated offline DOSBox-X configuration"
+            it.text = "Review offline DOSBox-X configuration"
             it.setOnClickListener {
                 val raw = try { offlineConf.readText() } catch (e: Exception) {
                     update("No converted config available: ${e.message}"); return@setOnClickListener
@@ -129,7 +151,7 @@ class WinKitSetupActivity : Activity() {
                     .setTitle("OFFLINE BOOT · Check the IMGMOUNT and BOOT commands")
                     .setMessage(display).setPositiveButton("Close", null).show()
             }
-            container.addView(it)
+            addAction(it)
         }
         acknowledged = CheckBox(this).also {
             it.text = "I reviewed the private disk path, IMGMOUNT geometry and BOOT command. This is an OFFLINE first boot."
@@ -137,15 +159,15 @@ class WinKitSetupActivity : Activity() {
             container.addView(it)
         }
         boot = Button(this).also {
-            it.text = "Open LOCAL emulation library (offline)"
+            it.text = "Open local emulator (offline)"
             it.setOnClickListener {
                 if (!isReady()) update("Both verified disk and converted offline config required")
                 else startActivity(Intent(this, MainActivity::class.java))
             }
-            container.addView(it)
+            addAction(it)
         }
         Button(this).also { export ->
-            export.text = "EXPORT WINKIT STARTUP / CRASH DIAGNOSTICS"
+            export.text = "Export startup / crash report"
             export.setOnClickListener {
                 // A native fault may be absent from retained Android crash history.
                 // The app-private stage log is independently exportable.
@@ -155,18 +177,36 @@ class WinKitSetupActivity : Activity() {
                     startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
                         type = "application/zip"
-                        putExtra(Intent.EXTRA_TITLE, "WinKit-A16-startup-diagnostics.zip")
+                        putExtra(Intent.EXTRA_TITLE, "WinKit-A19-startup-diagnostics.zip")
                     }, EXPORT_NATIVE_CRASH)
                 }
             }
-            container.addView(export)
+            addAction(export)
         }
-        status = label("A15: native guest boot remains UNVERIFIED.", 14f)
+        status = label("A19: Native emulator boot remains unverified.", 14f)
         label("IMPORTANT: Copied Windows computer name may still be YARDO/YARDO-B. Rename it to YARDOMOB and verify the NIC MAC before ANY network test.", 14f)
-        val scroll = ScrollView(this)
-        scroll.addView(container)
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = false
+            isVerticalScrollBarEnabled = true
+            addView(container)
+            setOnApplyWindowInsetsListener { view, insets ->
+                // Android edge-to-edge: keep controls clear of system bars.
+                val bars = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    insets.getInsets(WindowInsets.Type.systemBars())
+                } else null
+                view.setPadding(
+                    bars?.left ?: insets.systemWindowInsetLeft,
+                    bars?.top ?: insets.systemWindowInsetTop,
+                    bars?.right ?: insets.systemWindowInsetRight,
+                    bars?.bottom ?: insets.systemWindowInsetBottom
+                )
+                insets
+            }
+        }
         setContentView(scroll)
         refresh()
+        if (savedInstanceState == null) scroll.post { scroll.scrollTo(0, 0) }
     }
 
     private fun pick(req: Int) = startActivityForResult(
@@ -193,7 +233,7 @@ class WinKitSetupActivity : Activity() {
                         ?: error("Selected document provider returned no writable stream")
                     destination.use { out ->
                         ZipOutputStream(out).use { zip ->
-                            val summary = "WinKit A16 startup diagnostics\n" +
+                            val summary = "WinKit A19 startup diagnostics (A18 core probes)\n" +
                                 "Native crash history: ${if (exit != null) "available" else "not retained"}\n" +
                                 "Process: ${exit?.processName ?: "unknown"}\n" +
                                 "Exit timestamp: ${exit?.timestamp ?: 0L}\n" +
