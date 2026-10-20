@@ -28,7 +28,7 @@ import java.util.zip.ZipOutputStream
 /** A2 source overlay: standalone source import + offline-only launch selector.
  * No real Ethernet, Tailscale sockets, Windows files or remote-desktop code. */
 class WinKitSetupActivity : Activity() {
-    private companion object { const val PICK_IMAGE = 0x3120; const val PICK_CONFIG = 0x3121; const val EXPORT_NATIVE_CRASH = 0x3122; const val UI_RELEASE = "A19" }
+    private companion object { const val PICK_IMAGE = 0x3120; const val PICK_CONFIG = 0x3121; const val EXPORT_NATIVE_CRASH = 0x3122; const val UI_RELEASE = "A20" }
     private val mainThread = Handler(Looper.getMainLooper())
     private val workers = Executors.newSingleThreadExecutor()
     private val store by lazy { GuestStore(filesDir) }
@@ -177,13 +177,13 @@ class WinKitSetupActivity : Activity() {
                     startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
                         type = "application/zip"
-                        putExtra(Intent.EXTRA_TITLE, "WinKit-A19-startup-diagnostics.zip")
+                        putExtra(Intent.EXTRA_TITLE, "WinKit-A20-startup-diagnostics.zip")
                     }, EXPORT_NATIVE_CRASH)
                 }
             }
             addAction(export)
         }
-        status = label("A19: Native emulator boot remains unverified.", 14f)
+        status = label("A20: Native emulator boot remains unverified.", 14f)
         label("IMPORTANT: Copied Windows computer name may still be YARDO/YARDO-B. Rename it to YARDOMOB and verify the NIC MAC before ANY network test.", 14f)
         val scroll = ScrollView(this).apply {
             isFillViewport = true
@@ -233,7 +233,7 @@ class WinKitSetupActivity : Activity() {
                         ?: error("Selected document provider returned no writable stream")
                     destination.use { out ->
                         ZipOutputStream(out).use { zip ->
-                            val summary = "WinKit A19 startup diagnostics (A18 core probes)\n" +
+                            val summary = "WinKit A20 startup diagnostics (A18 core probes)\n" +
                                 "Native crash history: ${if (exit != null) "available" else "not retained"}\n" +
                                 "Process: ${exit?.processName ?: "unknown"}\n" +
                                 "Exit timestamp: ${exit?.timestamp ?: 0L}\n" +

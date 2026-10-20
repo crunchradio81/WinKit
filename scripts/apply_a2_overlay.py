@@ -299,9 +299,21 @@ def patch_core_sdlmain(data: str) -> str:
         '        MAPPER_StartUp();\n        DOSBOX_InitTickLoop();\n        DOSBOX_RealInit();\n'
         '        WK_A18_CORE("WinKit A18 stage 28: real init returned");',
         'A18 after init')
-    return replace_exact(data,'            DOSBOX_RunMachine();',
+    data = replace_exact(data,'            DOSBOX_RunMachine();',
         '            WK_A18_CORE("WinKit A18 stage 30: CPU loop entered");\n'
         '            DOSBOX_RunMachine();','A18 CPU loop')
+    # A20: the exported entry wrapper is the gap between stages 20 and 21.
+    # Block Android builds that would silently compile out the engine probes.
+    return replace_exact(data,
+        'extern "C" int dosbox_x_main(int argc, char *argv[]) {\n'
+        '#if defined(RETRODOS_HOST_PROVIDES_MAIN)',
+        '#if defined(__ANDROID__) && !defined(RETRODOS_HOST_PROVIDES_MAIN)\n'
+        '#error "WinKit Android must compile the embedded DOSBox-X entry"\n'
+        '#endif\n'
+        'extern "C" int dosbox_x_main(int argc, char *argv[]) {\n'
+        '    WK_A18_CORE("WinKit A20 stage 20A: DOSBox-X wrapper entered");\n'
+        '#if defined(RETRODOS_HOST_PROVIDES_MAIN)',
+        'A20 wrapper entry')
 
 
 def patch_manifest(data: str) -> str:
@@ -389,6 +401,10 @@ case "$(uname -s)" in
   *) echo "unsupported build host" >&2; exit 2 ;;
 esac
 TOOLCHAIN="$ANDROID_NDK/toolchains/llvm/prebuilt/$NDK_HOST_TAG"'''
+    data = replace_exact(data,
+        'CXXFLAGS="-fPIC -O2 -g0 -DANDROID"',
+        'CXXFLAGS="-fPIC -O2 -g0 -DANDROID -DRETRODOS_HOST_PROVIDES_MAIN"',
+        'A20 embedded DOSBox-X main macro')
     return replace_exact(data, old, new, 'NDK host tag')
 
 

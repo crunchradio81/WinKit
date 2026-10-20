@@ -99,6 +99,7 @@ class A8BuildTests(unittest.TestCase):
 -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF
     cmake --build "$OUT/sdl3-build" -j"$JOBS"
 APP_LIBS="$HERE/app/libs"
+CXXFLAGS="-fPIC -O2 -g0 -DANDROID"
 '''
         patched=patch_build(original)
         self.assertIn('SDL3-jar',patched)
@@ -106,6 +107,7 @@ APP_LIBS="$HERE/app/libs"
         self.assertIn('org/libsdl/app/SDLActivity.class',patched)
         self.assertIn('\\\n        -DSDL_ANDROID_JAR=ON',patched)
         self.assertIn('NDK_HOST_TAG=linux-x86_64',patched)
+        self.assertIn('-DRETRODOS_HOST_PROVIDES_MAIN',patched)
 
     def test_patch_rejects_changed_upstream_template(self):
         with self.assertRaisesRegex(ValueError,'expected 1'): patch_build('not-upstream-source')
