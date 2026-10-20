@@ -53,4 +53,13 @@ activity=(root/"overlay/kotlin/WinKitSetupActivity.kt").read_text()
 assert 'Selected document provider returned no writable stream' in activity
 assert 'Could not open save destination' not in activity
 assert 'Diagnostic export failed (' in activity
+assert 'const val UI_RELEASE = "A19"' in activity
+assert 'WinKit-A19-startup-diagnostics.zip' in activity
+assert 'WinKit A19 startup diagnostics (A18 core probes)' in activity
+assert 'setOnApplyWindowInsetsListener' in activity
+assert 'button.isAllCaps = false' in activity
+assert 'button.setSingleLine(false)' in activity
+assert 'isFillViewport = true' in activity
+assert 'it.setTextColor(bodyColor)' in activity
+assert 'addAction(export)' in activity
 print("PASS A18 pinned core startup checkpoints and document-provider diagnostics")
