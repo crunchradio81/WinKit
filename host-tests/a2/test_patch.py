@@ -60,8 +60,19 @@ class TestPatch(unittest.TestCase):
         self.assertEqual(s.count('android.intent.category.LAUNCHER'),1)
         with self.assertRaises(ValueError):p.patch_manifest(s)
     def test_gradle_unique(self):
-        self.assertIn('org.winkit.android.a2',p.patch_gradle('applicationId = "com.dosboxx.app"'))
-        with self.assertRaises(ValueError):p.patch_gradle('applicationId = "something.else"')
+        fixture = ('applicationId = "com.dosboxx.app"\n'
+                   '    packaging {\n'
+                   '        jniLibs {\n'
+                   '            useLegacyPackaging = true\n'
+                   '        }\n'
+                   '    }\n')
+        result = p.patch_gradle(fixture)
+        self.assertIn('org.winkit.android.a2', result)
+        self.assertIn('keepDebugSymbols += "**/*.so"', result)
+        self.assertEqual(result.count('keepDebugSymbols += "**/*.so"'), 1)
+        with self.assertRaises(ValueError): p.patch_gradle(result)
+        with self.assertRaises(ValueError): p.patch_gradle('applicationId = "something.else"')
+        with self.assertRaises(ValueError): p.patch_gradle('applicationId = "com.dosboxx.app"')
     def test_different_source_fails(self):
         with self.assertRaises(ValueError):p.patch_frontend('unexpected source')
         with self.assertRaises(ValueError):p.patch_manifest('<manifest/>')

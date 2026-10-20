@@ -169,8 +169,20 @@ def patch_manifest(data: str) -> str:
 
 
 def patch_gradle(data: str) -> str:
-    return replace_exact(data, 'applicationId = "com.dosboxx.app"',
+    data = replace_exact(data, 'applicationId = "com.dosboxx.app"',
                          f'applicationId = "{APP_ID}"', 'application ID')
+    # Android Gradle Plugin normally strips native symbols when packaging,
+    # changing the .so bytes even if they came from the just-built JNI folder.
+    # A10 debug acceptance compares SHA-256 of each packaged ELF with the
+    # freshly compiled file, so preserve those exact ELF bytes. Future
+    # optimized/release packaging can use a separate authenticated build-id
+    # strategy; do not weaken this strong debug-build provenance gate.
+    return replace_exact(data,
+                         '            useLegacyPackaging = true',
+                         '            useLegacyPackaging = true\n'
+                         '            // A10: preserve exact native ELF bytes for APK SHA-256 validation.\n'
+                         '            keepDebugSymbols += "**/*.so"',
+                         'preserve native ELF bytes in debug APK')
 
 
 def patch_build(data: str) -> str:
