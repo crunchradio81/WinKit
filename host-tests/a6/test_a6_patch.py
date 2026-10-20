@@ -26,6 +26,9 @@ void engine() {
         if (!g.conf_override.empty()) {
             /* A machine's conf is its own, but the floppy drives on the
         }
+    // Model upstream frontend: this startup anchor is AFTER the launch lambda.
+    auto launch = [&](const Game &candidate) {};
+    /* ---- Opening straight onto one screen, for the store captures --------
 }
 '''
         result=patch.patch_frontend(data)
@@ -35,6 +38,15 @@ void engine() {
         self.assertIn('g.name != "WinKit 3.11 - YARDOMOB (OFFLINE)"',result)
         self.assertNotIn('image_matches_profile(conf,',result)
         self.assertEqual(result.count('retrodos_host_run(5, argv)'),1)
+        self.assertIn('WinKit A12: enter the independently validated offline machine directly.', result)
+        self.assertIn('candidate.is_machine', result)
+        self.assertIn('candidate.dir == cfg_dir + "/machines"', result)
+        self.assertIn('launch(candidate);', result)
+        self.assertLess(result.index('auto launch ='), result.index('launch(candidate);'))
+        # The strict upstream-anchor check must still reject a changed frontend.
+        with self.assertRaises(ValueError):
+            patch.patch_frontend(data.replace(
+                '    /* ---- Opening straight onto one screen, for the store captures --------', ''))
         with self.assertRaises(ValueError): patch.patch_frontend(result)
     def test_overlay_contains_native_snapshot(self):
         src=(ROOT/'scripts/apply_a2_overlay.py').read_text()
