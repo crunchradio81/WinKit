@@ -47,6 +47,35 @@ jobs:
         uses: android-actions/setup-android@v4
         with:
           packages: ''
+      - name: Require persistent WinKit Android signing key
+        shell: bash
+        env:
+          WK_STORE_B64: ${{ secrets.WINKIT_SIGNING_KEYSTORE_B64 }}
+          WK_STORE_PASSWORD: ${{ secrets.WINKIT_SIGNING_STORE_PASSWORD }}
+          WK_KEY_ALIAS: ${{ secrets.WINKIT_SIGNING_KEY_ALIAS }}
+          WK_KEY_PASSWORD: ${{ secrets.WINKIT_SIGNING_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for key in WK_STORE_B64 WK_STORE_PASSWORD WK_KEY_ALIAS WK_KEY_PASSWORD; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "Missing WinKit update-signing secret: $key" >&2
+              echo "Run scripts/SETUP_ANDROID_UPDATE_KEY_TERMUX.sh from the Android source branch." >&2
+              exit 2
+            fi
+          done
+          umask 077
+          STORE="$RUNNER_TEMP/winkit-update.jks"
+          printf '%s' "$WK_STORE_B64" | base64 --decode > "$STORE"
+          test -s "$STORE"
+          keytool -list -keystore "$STORE" -alias "$WK_KEY_ALIAS" -storepass "$WK_STORE_PASSWORD" >/dev/null
+          {
+            echo "ANDROID_KEYSTORE_PATH=$STORE"
+            echo "ANDROID_KEYSTORE_PASSWORD=$WK_STORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$WK_KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$WK_KEY_PASSWORD"
+            echo "WINKIT_ANDROID_VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER))"
+          } >> "$GITHUB_ENV"
+          echo "WinKit persistent signer validated. Private keystore is outside checkout and artifacts."
       - name: Install Linux and Android prerequisites
         shell: bash
         run: |
@@ -73,6 +102,30 @@ jobs:
           set -euo pipefail
           cd "$WINKIT_SOURCE_ROOT"
           bash scripts/BUILD_A10_ANDROID.sh 2>&1 | tee "$RUNNER_TEMP/a10-android-build.log"
+      - name: Verify APK signer and update version
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$WINKIT_SOURCE_ROOT/_build_outputs/WinKit311-Android-A10-debug-DEVICE-UNVERIFIED.apk"
+          test -s "$APK"
+          APKSIGNER="$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner"
+          AAPT2="$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt2"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > "$RUNNER_TEMP/winkit-apk-verification.txt"
+          apk_digest="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/winkit-apk-verification.txt" | head -n 1)"
+          key_digest="$(keytool -list -v -keystore "$ANDROID_KEYSTORE_PATH" -alias "$ANDROID_KEY_ALIAS" -storepass "$ANDROID_KEYSTORE_PASSWORD" | sed -n 's/^[[:space:]]*SHA256: //p' | head -n 1 | tr -d ':' | tr 'A-F' 'a-f')"
+          if [[ -z "$apk_digest" || -z "$key_digest" || "$apk_digest" != "$key_digest" ]]; then
+            echo "APK certificate does NOT match the persistent WinKit update key." >&2
+            exit 2
+          fi
+          badging="$("$AAPT2" dump badging "$APK")"
+          if [[ "$badging" != *"versionCode='$WINKIT_ANDROID_VERSION_CODE'"* ]]; then
+            echo "APK version code does not match monotonically increasing CI version." >&2
+            exit 2
+          fi
+          echo "WinKit update certificate SHA-256: $apk_digest"
+          echo "WinKit update version code: $WINKIT_ANDROID_VERSION_CODE"
+          echo "Persistent signer and APK update identity VERIFIED (not a device boot test)."
       - name: Upload diagnostic logs (including failed builds)
         if: always()
         uses: actions/upload-artifact@v4
@@ -81,6 +134,7 @@ jobs:
           path: |
             ${{ runner.temp }}/a10-android-build.log
             ${{ runner.temp }}/kotlin-compiler-sha256.txt
+            ${{ runner.temp }}/winkit-apk-verification.txt
             ${{ runner.temp }}/winkit-source/_external/Retro-Dosbox/android/build/tree-arm64-v8a/config.log
             ${{ runner.temp }}/winkit-source/_external/Retro-Dosbox/android/build/arm64-v8a/sdl3-build/CMakeCache.txt
             ${{ runner.temp }}/winkit-source/_external/Retro-Dosbox/android/build/arm64-v8a/sdl3-build/CMakeFiles/CMakeConfigureLog.yaml
