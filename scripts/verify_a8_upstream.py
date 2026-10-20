@@ -9,7 +9,7 @@ from pathlib import Path
 import argparse
 import subprocess
 import sys
-from apply_a2_overlay import APP_SHA, CORE_SHA, patch_frontend, patch_gradle, patch_manifest, patch_build, ROOT
+from apply_a2_overlay import APP_SHA, CORE_SHA, patch_frontend, patch_gradle, patch_manifest, patch_build, patch_core_host, patch_core_sdlmain, ROOT
 
 PATCHES = {
     'frontend/retrodos_frontend.cpp': patch_frontend,
@@ -17,6 +17,8 @@ PATCHES = {
     'android/app/build.gradle.kts': patch_gradle,
     'android/build-core.sh': patch_build,
 }
+CORE_PATCHES = {'src/gui/retrodos_host.cpp': patch_core_host,
+                'src/gui/sdlmain.cpp': patch_core_sdlmain}
 KOTLIN_DIR = 'android/app/src/main/java/com/crownparkcomputing/retrodos/winkit'
 NATIVE_DIR = 'frontend'
 
@@ -31,8 +33,13 @@ def verify(repo: Path):
     changed = set(git(repo, 'diff', '--name-only', '--ignore-submodules=all').splitlines())
     if changed != set(PATCHES):
         raise ValueError('unexpected/missing upstream tracked changes: '+repr(sorted(changed)))
-    if git(repo/'core', 'diff', '--name-only').strip():
-        raise ValueError('DOSBox-X core tracked files were modified')
+    core_changed = set(git(repo/'core', 'diff', '--name-only').splitlines())
+    if core_changed != set(CORE_PATCHES):
+        raise ValueError('unexpected/missing core changes: '+repr(sorted(core_changed)))
+    for relative, transform in CORE_PATCHES.items():
+        original = git(repo/'core', 'show', 'HEAD:' + relative)
+        if (repo/'core'/relative).read_text() != transform(original):
+            raise ValueError('core file not EXACT A18 diagnostic overlay: '+relative)
     for relative, transform in PATCHES.items():
         original = git(repo, 'show', 'HEAD:' + relative)
         expected = transform(original)

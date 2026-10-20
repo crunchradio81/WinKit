@@ -108,6 +108,9 @@ static void winkit_a16_checkpoint(const char *stage) {
         static_cast<ssize_t>(line.size())) (void)::fsync(fd);
     ::close(fd);
 }
+extern "C" void winkit_a18_core_checkpoint(const char *stage) {
+    winkit_a16_checkpoint(stage);
+}
 #endif
 '''
 
@@ -234,6 +237,73 @@ def patch_frontend(data: str) -> str:
         'WinKit A12 launch after lambda')
 
 
+# A18: instrument ONLY the two pinned DOSBox-X startup files.
+def patch_core_host(data: str) -> str:
+    data = replace_exact(data,
+        'extern "C" int dosbox_x_main(int argc, char *argv[]);',
+        'extern "C" int dosbox_x_main(int argc, char *argv[]);\n'
+        '#if defined(__ANDROID__)\n'
+        'extern "C" void winkit_a18_core_checkpoint(const char *stage);\n'
+        '#define WK_A18_HOST(s) winkit_a18_core_checkpoint(s)\n'
+        '#else\n#define WK_A18_HOST(s) ((void)0)\n#endif',
+        'A18 host declaration')
+    return replace_exact(data,
+        '    g_embedded.store(true);\n    g_running.store(true);\n'
+        '    const int rc = dosbox_x_main(argc, argv);',
+        '    g_embedded.store(true);\n    g_running.store(true);\n'
+        '    WK_A18_HOST("WinKit A18 stage 20: before dosbox_x_main");\n'
+        '    const int rc = dosbox_x_main(argc, argv);\n'
+        '    WK_A18_HOST("WinKit A18 stage 29: dosbox_x_main returned");',
+        'A18 host entry')
+
+
+def patch_core_sdlmain(data: str) -> str:
+    data = replace_exact(data,
+        '#if defined(RETRODOS_HOST_PROVIDES_MAIN)\n'
+        'int dosbox_x_engine_main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {',
+        '#if defined(__ANDROID__) && defined(RETRODOS_HOST_PROVIDES_MAIN)\n'
+        'extern "C" void winkit_a18_core_checkpoint(const char *stage);\n'
+        '#define WK_A18_CORE(s) winkit_a18_core_checkpoint(s)\n'
+        '#else\n#define WK_A18_CORE(s) ((void)0)\n#endif\n'
+        '#if defined(RETRODOS_HOST_PROVIDES_MAIN)\n'
+        'int dosbox_x_engine_main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {\n'
+        '    WK_A18_CORE("WinKit A18 stage 21: engine main entered");',
+        'A18 engine entry')
+    data = replace_exact(data,
+        '    CommandLine com_line(argc,argv);\n    Config myconf(&com_line);',
+        '    CommandLine com_line(argc,argv);\n    Config myconf(&com_line);\n'
+        '    WK_A18_CORE("WinKit A18 stage 22: config constructed");',
+        'A18 config')
+    data = replace_exact(data, '    if (!DOSBOX_parse_argv()) return 1;',
+        '    WK_A18_CORE("WinKit A18 stage 23: before argv");\n'
+        '    if (!DOSBOX_parse_argv()) return 1;\n'
+        '    WK_A18_CORE("WinKit A18 stage 24: argv parsed");','A18 argv')
+    data = replace_exact(data,
+        '        /* -- SDL init */\n'
+        '        if (SDL_Init(SDL_INIT_AUDIO|SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_NOPARACHUTE) >= 0)',
+        '        /* -- SDL init */\n'
+        '        WK_A18_CORE("WinKit A18 stage 25: before SDL init");\n'
+        '        if (SDL_Init(SDL_INIT_AUDIO|SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_NOPARACHUTE) >= 0)',
+        'A18 SDL start')
+    data = replace_exact(data,
+        '        else\n            E_Exit("Can\'t init SDL %s",SDL_GetError());',
+        '        else\n            E_Exit("Can\'t init SDL %s",SDL_GetError());\n'
+        '        WK_A18_CORE("WinKit A18 stage 26: SDL initialized");',
+        'A18 SDL complete')
+    data = replace_exact(data,
+        '        /* Start up main machine */',
+        '        WK_A18_CORE("WinKit A18 stage 27: starting machine");\n'
+        '        /* Start up main machine */','A18 machine')
+    data = replace_exact(data,
+        '        MAPPER_StartUp();\n        DOSBOX_InitTickLoop();\n        DOSBOX_RealInit();',
+        '        MAPPER_StartUp();\n        DOSBOX_InitTickLoop();\n        DOSBOX_RealInit();\n'
+        '        WK_A18_CORE("WinKit A18 stage 28: real init returned");',
+        'A18 after init')
+    return replace_exact(data,'            DOSBOX_RunMachine();',
+        '            WK_A18_CORE("WinKit A18 stage 30: CPU loop entered");\n'
+        '            DOSBOX_RunMachine();','A18 CPU loop')
+
+
 def patch_manifest(data: str) -> str:
     if 'org.winkit.android.a2' in data or 'WinKitSetupActivity' in data:
         raise ValueError('Manifest already patched')
@@ -336,6 +406,8 @@ def apply(repo: Path):
         repo / 'android/app/src/main/AndroidManifest.xml': patch_manifest,
         repo / 'android/app/build.gradle.kts': patch_gradle,
         repo / 'android/build-core.sh': patch_build,
+        repo / 'core/src/gui/retrodos_host.cpp': patch_core_host,
+        repo / 'core/src/gui/sdlmain.cpp': patch_core_sdlmain,
     }
     # Prepare all transforms before writing anything; fail closed on mismatch.
     changes = {path: transform(path.read_text()) for path, transform in targets.items()}

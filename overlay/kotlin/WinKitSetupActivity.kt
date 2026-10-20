@@ -53,8 +53,8 @@ class WinKitSetupActivity : Activity() {
             it.setPadding(0, 10, 0, 10)
             container.addView(it)
         }
-        label("WinKit 3.11 · A16 Persistent Diagnostics", 24f)
-        label("A16 persistent offline startup trace enabled. BIOS boot remains UNVERIFIED.", 14f)
+        label("WinKit 3.11 · A18 Core Startup Diagnostics", 24f)
+        label("A18 core startup checkpoints enabled. BIOS boot remains UNVERIFIED.", 14f)
         val prefs = getSharedPreferences("winkit-machine-identity", MODE_PRIVATE)
         val proposedMac = prefs.getString("proposed_mac", null) ?: GuestIdentity.newLocalMac().also {
             prefs.edit().putString("proposed_mac", it).apply()
@@ -189,7 +189,9 @@ class WinKitSetupActivity : Activity() {
                     require(available || exit != null) { "No WinKit diagnostics available" }
                     var savedLog = false
                     var savedTombstone = false
-                    contentResolver.openOutputStream(uri, "w")?.use { out ->
+                    val destination = contentResolver.openOutputStream(uri, "w")
+                        ?: error("Selected document provider returned no writable stream")
+                    destination.use { out ->
                         ZipOutputStream(out).use { zip ->
                             val summary = "WinKit A16 startup diagnostics\n" +
                                 "Native crash history: ${if (exit != null) "available" else "not retained"}\n" +
@@ -214,9 +216,9 @@ class WinKitSetupActivity : Activity() {
                                 savedTombstone = true
                             }
                         }
-                    } ?: error("Could not open save destination")
+                    } // A completed ZIP must not be reported as a failed write.
                     "WinKit diagnostics saved: startup log=$savedLog, tombstone=$savedTombstone"
-                } catch (e: Exception) { "Native crash export failed: ${e.message}" }
+                } catch (e: Exception) { "Diagnostic export failed (${e.javaClass.simpleName}): ${e.message}" }
                 update(message)
             }
             return
