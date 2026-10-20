@@ -28,6 +28,7 @@ new_floppy_guard = """        if (!g.conf_override.empty() &&
 
 WINKIT_CPP = '''
 #if defined(__ANDROID__)
+        winkit_native_probe = "A13: SDL_GetAndroidInternalStoragePath returned null";
         // WinKit A2: independent, app-private DOS 6.22 / WFW 3.11 machine.
         // The setup Activity imports the disk and creates an offline config first.
         // Never silently launch, mount any Mac disk, or enable an Ethernet socket.
@@ -36,20 +37,28 @@ WINKIT_CPP = '''
             const std::string diskPath = machineRoot + "/YARDOMOB.raw";
             const std::string configPath = machineRoot + "/YARDOMOB.offline.conf";
             const std::string readyPath = machineRoot + "/OFFLINE_READY";
-            SDL_PathInfo diskInfo;
-            SDL_PathInfo profileInfo;
+            winkit_native_probe = "A13: OFFLINE_READY missing/invalid: " + readyPath;
+            SDL_PathInfo diskInfo{};
+            SDL_PathInfo profileInfo{};
             size_t markerBytes = 0, configBytes = 0;
             void *marker = SDL_LoadFile(readyPath.c_str(), &markerBytes);
             // If a selection was interrupted, no ready marker exists.
             const bool ready = marker && markerBytes == 11 &&
                 std::memcmp(marker, "a2-offline\\n", 11) == 0;
             if (marker) SDL_free(marker);
-            if (ready && SDL_GetPathInfo(diskPath.c_str(), &diskInfo) &&
+            const bool diskOK = SDL_GetPathInfo(diskPath.c_str(), &diskInfo) &&
                 diskInfo.type == SDL_PATHTYPE_FILE && diskInfo.size >= 512 &&
-                (diskInfo.size % 512) == 0 &&
-                SDL_GetPathInfo(configPath.c_str(), &profileInfo) &&
+                (diskInfo.size % 512) == 0;
+            const bool confOK = SDL_GetPathInfo(configPath.c_str(), &profileInfo) &&
                 profileInfo.type == SDL_PATHTYPE_FILE &&
-                profileInfo.size > 0 && profileInfo.size <= 262144) {
+                profileInfo.size > 0 && profileInfo.size <= 262144;
+            if (ready && !diskOK)
+                winkit_native_probe = "A13: disk missing/invalid at SDL path: " + diskPath;
+            else if (ready && !confOK)
+                winkit_native_probe = "A13: offline.conf missing/invalid: " + configPath;
+            else if (ready)
+                winkit_native_probe = "A13: offline policy rejected config: " + configPath;
+            if (ready && diskOK && confOK) {
                 void *data = SDL_LoadFile(configPath.c_str(), &configBytes);
                 if (data) {
                     std::string profile(static_cast<const char*>(data), configBytes);
@@ -63,10 +72,12 @@ WINKIT_CPP = '''
                         w.keyboard_on_start = true;
                         w.initial = 'W';
                         games.push_back(std::move(w));
+                        winkit_native_probe = "A13: native offline machine recognized";
                     }
                 }
             }
         }
+        SDL_Log("%s", winkit_native_probe.c_str());
 #endif
 '''
 
@@ -85,7 +96,10 @@ def patch_frontend(data: str) -> str:
     if INSERT_AFTER not in data or data.count(PATCH_POINT) != 1:
         raise ValueError('Unrecognized upstream scan function')
     data = replace_exact(data, '#include "retrodos_host.h"',
-                         '#include "retrodos_host.h"\n#include "winkit_offline_gate.h"\n#include "winkit_image_lease.h"\n#include "winkit_raw_geometry.h"\n#include "winkit_launch_snapshot.h"', 'native include')
+                         '#include "retrodos_host.h"\n#include "winkit_offline_gate.h"\n#include "winkit_image_lease.h"\n#include "winkit_raw_geometry.h"\n#include "winkit_launch_snapshot.h"\n'
+                         '#if defined(__ANDROID__)\n'
+                         'static std::string winkit_native_probe = "A13: native disk scan has not run";\n'
+                         '#endif', 'native include')
     data = replace_exact(data, PATCH_POINT, WINKIT_CPP + PATCH_POINT, 'refresh closure')
     # Machine-specific lock is on the worker thread for the full emulator lifetime.
     # A non-WinKit title must never be subject to this lease.
@@ -149,6 +163,14 @@ def patch_frontend(data: str) -> str:
                 break;
             }
         }
+    }
+    // An unready native guest must not silently fall into the generic wizard.
+    // Report failure without modifying disks, profiles or networking.
+    if (view == View::Wizard) {
+        SDL_Log("WinKit A13 startup blocked: %s", winkit_native_probe.c_str());
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING,
+            "WinKit A13 - offline guest not started",
+            winkit_native_probe.c_str(), win);
     }
 #endif
 
