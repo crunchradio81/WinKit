@@ -1,4 +1,4 @@
-name: WinKit A10 Android ARM64 Build (device unverified)
+name: WinKit A26 Android ARM64 Diagnostics Build (device unverified)
 on:
   workflow_dispatch:
 permissions:
@@ -11,18 +11,18 @@ jobs:
       ANDROID_API: '28'
       ANDROID_ABI: arm64-v8a
     steps:
-      - name: Checkout A10 source (independent development branch)
+      - name: Checkout A26 source (independent development branch)
         uses: actions/checkout@v4
         with:
-          ref: android-a10-source
+          ref: android-a26-keyboard-diagnostics
       - name: Verify Android source branch and build entry point
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git branch --show-current)" = android-a10-source
+          test "$(git branch --show-current)" = android-a26-keyboard-diagnostics
           test -f scripts/BUILD_A10_ANDROID.sh
           test -f MANIFEST.sha256
-          echo "Compiling source from: $(git rev-parse HEAD) (android-a10-source)"
+          echo "Compiling source from: $(git rev-parse HEAD) (android-a26-keyboard-diagnostics)"
       - name: Prepare manifest-clean source snapshot
         shell: bash
         run: |
@@ -34,6 +34,14 @@ jobs:
           # The integrity verifier is deliberately strict. Git metadata and
           # build/test logs must remain OUTSIDE this source snapshot.
           python3 "$SOURCE_ROOT/VERIFY_A10.py"
+      - name: Verify A26 keyboard diagnostics and launch transitions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$WINKIT_SOURCE_ROOT"
+          python3 host-tests/a18/test_core_probe_contract.py
+          grep -Fq 'WinKit A26: keyboard toggle requested' scripts/apply_a2_overlay.py
+          grep -Fq 'WinKit A26: engine joined; returning to launcher' scripts/apply_a2_overlay.py
       - name: Java 17
         uses: actions/setup-java@v4
         with:
@@ -130,7 +138,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: WinKit311-A10-Android-Build-Logs
+          name: WinKit311-A26-Android-Build-Logs
           path: |
             ${{ runner.temp }}/a10-android-build.log
             ${{ runner.temp }}/kotlin-compiler-sha256.txt
@@ -146,7 +154,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: WinKit311-A10-Android-ARM64-DEVICE-UNVERIFIED
+          name: WinKit311-A26-Android-ARM64-DEVICE-UNVERIFIED
           path: |
             ${{ runner.temp }}/winkit-source/_build_outputs/WinKit311-Android-A10-debug-DEVICE-UNVERIFIED.apk
             ${{ runner.temp }}/winkit-source/_build_outputs/A10-BUILD-SHA256SUMS.txt
