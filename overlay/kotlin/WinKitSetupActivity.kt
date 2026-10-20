@@ -39,6 +39,7 @@ class WinKitSetupActivity : Activity() {
     private val machineDir get() = File(filesDir, "machines")
     private val offlineConf get() = File(machineDir, "YARDOMOB.offline.conf")
     private val ready get() = File(machineDir, "OFFLINE_READY")
+    private val nativeTrace get() = File(filesDir, "winkit-native-startup.log")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,8 +53,8 @@ class WinKitSetupActivity : Activity() {
             it.setPadding(0, 10, 0, 10)
             container.addView(it)
         }
-        label("WinKit 3.11 · A15 Native Crash Diagnostics", 24f)
-        label("A15 private crash export enabled. BIOS boot remains UNVERIFIED.", 14f)
+        label("WinKit 3.11 · A16 Persistent Diagnostics", 24f)
+        label("A16 persistent offline startup trace enabled. BIOS boot remains UNVERIFIED.", 14f)
         val prefs = getSharedPreferences("winkit-machine-identity", MODE_PRIVATE)
         val proposedMac = prefs.getString("proposed_mac", null) ?: GuestIdentity.newLocalMac().also {
             prefs.edit().putString("proposed_mac", it).apply()
@@ -144,17 +145,17 @@ class WinKitSetupActivity : Activity() {
             container.addView(it)
         }
         Button(this).also { export ->
-            export.text = "EXPORT LATEST WINKIT NATIVE CRASH REPORT"
+            export.text = "EXPORT WINKIT STARTUP / CRASH DIAGNOSTICS"
             export.setOnClickListener {
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                    update("Native crash export requires Android 12 or later")
-                } else if (latestNativeExit() == null) {
-                    update("No WinKit native crash record available")
+                // A native fault may be absent from retained Android crash history.
+                // The app-private stage log is independently exportable.
+                if (!hasNativeTrace() && latestNativeExit() == null) {
+                    update("No WinKit diagnostics yet. Launch the offline guest, return here and export.")
                 } else {
                     startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
                         type = "application/zip"
-                        putExtra(Intent.EXTRA_TITLE, "WinKit-A15-native-crash.zip")
+                        putExtra(Intent.EXTRA_TITLE, "WinKit-A16-startup-diagnostics.zip")
                     }, EXPORT_NATIVE_CRASH)
                 }
             }
@@ -183,28 +184,38 @@ class WinKitSetupActivity : Activity() {
         if (requestCode == EXPORT_NATIVE_CRASH) {
             workers.execute {
                 val message = try {
-                    val exit = latestNativeExit() ?: error("Native crash no longer available")
-                    var hasTombstone = false
+                    val exit = latestNativeExit()
+                    val available = hasNativeTrace()
+                    require(available || exit != null) { "No WinKit diagnostics available" }
+                    var savedLog = false
+                    var savedTombstone = false
                     contentResolver.openOutputStream(uri, "w")?.use { out ->
                         ZipOutputStream(out).use { zip ->
-                            val summary = "WinKit A15 native crash evidence\n" +
-                                "Process: ${exit.processName}\n" +
-                                "Exit timestamp: ${exit.timestamp}\n" +
-                                "Reason: ${exit.reason}\n" +
-                                "Guest disk, offline config, NIC and network content are excluded.\n"
+                            val summary = "WinKit A16 startup diagnostics\n" +
+                                "Native crash history: ${if (exit != null) "available" else "not retained"}\n" +
+                                "Process: ${exit?.processName ?: "unknown"}\n" +
+                                "Exit timestamp: ${exit?.timestamp ?: 0L}\n" +
+                                "Reason: ${exit?.reason ?: "unknown"}\n" +
+                                "Startup checkpoints are not a symbolized native backtrace.\n" +
+                                "Guest disk, offline config and network data are excluded.\n"
                             zip.putNextEntry(ZipEntry("summary.txt"))
                             zip.write(summary.toByteArray(StandardCharsets.UTF_8))
                             zip.closeEntry()
-                            exit.traceInputStream?.use { trace ->
+                            if (available) {
+                                zip.putNextEntry(ZipEntry("native-startup.log"))
+                                nativeTrace.inputStream().use { it.copyTo(zip) }
+                                zip.closeEntry()
+                                savedLog = true
+                            }
+                            exit?.traceInputStream?.use { trace ->
                                 zip.putNextEntry(ZipEntry("native-tombstone.pb"))
                                 trace.copyTo(zip)
                                 zip.closeEntry()
-                                hasTombstone = true
+                                savedTombstone = true
                             }
                         }
                     } ?: error("Could not open save destination")
-                    if (hasTombstone) "WinKit native crash ZIP saved; no guest disk exported"
-                    else "Crash metadata saved, but Android did not retain its native tombstone"
+                    "WinKit diagnostics saved: startup log=$savedLog, tombstone=$savedTombstone"
                 } catch (e: Exception) { "Native crash export failed: ${e.message}" }
                 update(message)
             }
@@ -280,6 +291,10 @@ class WinKitSetupActivity : Activity() {
             mainThread.post { refresh(); update(message) }
         }
     }
+
+    private fun hasNativeTrace(): Boolean = nativeTrace.isFile &&
+        !java.nio.file.Files.isSymbolicLink(nativeTrace.toPath()) &&
+        nativeTrace.length() in 1L..262144L
 
     private fun latestNativeExit(): ApplicationExitInfo? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null

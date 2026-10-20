@@ -77,7 +77,36 @@ WINKIT_CPP = '''
                 }
             }
         }
+        winkit_a16_checkpoint("WinKit A16 stage 00: native discovery finished");
         SDL_Log("%s", winkit_native_probe.c_str());
+#endif
+'''
+A16_CHECKPOINT_CPP = r'''
+// A16: persistent, app-private, bounded startup checkpoints; never guest data.
+#if defined(__ANDROID__)
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+static void winkit_a16_checkpoint(const char *stage) {
+    SDL_Log("%s", stage);
+    const char *root = SDL_GetAndroidInternalStoragePath();
+    if (!root) return;
+    const std::string file = std::string(root) + "/winkit-native-startup.log";
+    const int fd = ::open(file.c_str(),
+        O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (fd < 0) return;
+    struct stat info{};
+    if (::fstat(fd, &info) != 0 || !S_ISREG(info.st_mode) ||
+        info.st_nlink != 1 || info.st_size >= 262144) {
+        ::close(fd);
+        return;
+    }
+    const std::string line = std::to_string(::getpid()) + " " +
+        std::to_string(SDL_GetTicks()) + "ms " + stage + "\n";
+    if (::write(fd, line.data(), line.size()) ==
+        static_cast<ssize_t>(line.size())) (void)::fsync(fd);
+    ::close(fd);
+}
 #endif
 '''
 
@@ -101,12 +130,16 @@ def patch_frontend(data: str) -> str:
                          'static std::string winkit_native_probe = "A13: native disk scan has not run";\n'
                          '#endif', 'native include')
     data = replace_exact(data, PATCH_POINT, WINKIT_CPP + PATCH_POINT, 'refresh closure')
+    data = replace_exact(data,
+        'static std::string winkit_native_probe = "A13: native disk scan has not run";\n',
+        'static std::string winkit_native_probe = "A13: native disk scan has not run";\n'
+        + A16_CHECKPOINT_CPP, 'A16 persistent native checkpoints')
     # Machine-specific lock is on the worker thread for the full emulator lifetime.
     # A non-WinKit title must never be subject to this lease.
     engine_anchor = '    retrodos_host_set_window(nullptr);\n\n    char a0[]'
     engine_with_lease = '''    retrodos_host_set_window(nullptr);
 #if defined(__ANDROID__)
-    SDL_Log("WinKit A15 stage 10: engine thread entered");
+    winkit_a16_checkpoint("WinKit A15 stage 10: engine thread entered");
     const char *privateRoot = SDL_GetAndroidInternalStoragePath();
     const std::string machineRoot = privateRoot ? std::string(privateRoot) + "/machines" : "";
     if (!machineRoot.empty() && workdir == machineRoot) {
@@ -116,7 +149,7 @@ def patch_frontend(data: str) -> str:
             g_engine_done.store(true);
             return;
         }
-        SDL_Log("WinKit A15 stage 11: disk lease acquired");
+        winkit_a16_checkpoint("WinKit A15 stage 11: disk lease acquired");
         // Recheck after obtaining the disk lease, before starting guest code.
         // The frontend profile was loaded earlier and may be stale if files changed.
         // `conf` is a FILE PATH, never pass it as raw profile contents.
@@ -130,7 +163,7 @@ def patch_frontend(data: str) -> str:
             g_engine_done.store(true);
             return;
         }
-        SDL_Log("WinKit A15 stage 12: launch snapshot validated");
+        winkit_a16_checkpoint("WinKit A15 stage 12: launch snapshot validated");
         // No separate emulation window: the existing SDL3 render thread owns it.
         char a0[] = "dosbox-x";
         char a1[] = "-conf";
@@ -139,9 +172,9 @@ def patch_frontend(data: str) -> str:
         std::vector<char> d(workdir.begin(), workdir.end()); d.push_back('\\0');
         char *argv[] = { a0, a1, c.data(), a3, d.data(), nullptr };
         retrodos_host_set_framebuffer_output(true);
-        SDL_Log("WinKit A15 stage 13: entering DOSBox-X core");
+        winkit_a16_checkpoint("WinKit A15 stage 13: entering DOSBox-X core");
         retrodos_host_run(5, argv);
-        SDL_Log("WinKit A15 stage 14: DOSBox-X core returned");
+        winkit_a16_checkpoint("WinKit A15 stage 14: DOSBox-X core returned");
         g_engine_done.store(true);
         return; // lease scope ends here, after core shutdown
     }
@@ -164,9 +197,9 @@ def patch_frontend(data: str) -> str:
                 candidate.name == "WinKit 3.11 - YARDOMOB (OFFLINE)" &&
                 candidate.dir == cfg_dir + "/machines" &&
                 !candidate.conf_override.empty()) {
-                SDL_Log("WinKit A15 stage 01: found validated YARDOMOB; calling launch");
+                winkit_a16_checkpoint("WinKit A15 stage 01: found validated YARDOMOB; calling launch");
                 launch(candidate);
-                SDL_Log("WinKit A15 stage 02: launch returned to frontend");
+                winkit_a16_checkpoint("WinKit A15 stage 02: launch returned to frontend");
                 break;
             }
         }

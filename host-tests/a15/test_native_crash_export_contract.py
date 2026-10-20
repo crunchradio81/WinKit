@@ -7,7 +7,7 @@ native=(root/"scripts/apply_a2_overlay.py").read_text()
 for token in (
     "getHistoricalProcessExitReasons(packageName, 0, 32)",
     "ApplicationExitInfo.REASON_CRASH_NATIVE",
-    "exit.traceInputStream?.use",
+    "exit?.traceInputStream?.use",
     'ZipEntry("native-tombstone.pb")',
     'ZipEntry("summary.txt")',
     "Intent.ACTION_CREATE_DOCUMENT",
