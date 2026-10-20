@@ -28,7 +28,7 @@ import java.util.zip.ZipOutputStream
 /** A2 source overlay: standalone source import + offline-only launch selector.
  * No real Ethernet, Tailscale sockets, Windows files or remote-desktop code. */
 class WinKitSetupActivity : Activity() {
-    private companion object { const val PICK_IMAGE = 0x3120; const val PICK_CONFIG = 0x3121; const val EXPORT_NATIVE_CRASH = 0x3122; const val UI_RELEASE = "A23" }
+    private companion object { const val PICK_IMAGE = 0x3120; const val PICK_CONFIG = 0x3121; const val EXPORT_NATIVE_CRASH = 0x3122; const val UI_RELEASE = "A24" }
     private val mainThread = Handler(Looper.getMainLooper())
     private val workers = Executors.newSingleThreadExecutor()
     private val store by lazy { GuestStore(filesDir) }
@@ -76,7 +76,7 @@ class WinKitSetupActivity : Activity() {
             container.addView(button, layout)
         }
         label("WinKit 3.11 Android · $UI_RELEASE", 23f)
-        label("A23 graphics startup checkpoints enabled. Guest boot is not yet verified.", 14f)
+        label("A24 embedded Game Link enabled. Guest boot is not yet verified.", 14f)
         val prefs = getSharedPreferences("winkit-machine-identity", MODE_PRIVATE)
         val proposedMac = prefs.getString("proposed_mac", null) ?: GuestIdentity.newLocalMac().also {
             prefs.edit().putString("proposed_mac", it).apply()
@@ -177,13 +177,13 @@ class WinKitSetupActivity : Activity() {
                     startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
                         type = "application/zip"
-                        putExtra(Intent.EXTRA_TITLE, "WinKit-A23-startup-diagnostics.zip")
+                        putExtra(Intent.EXTRA_TITLE, "WinKit-A24-startup-diagnostics.zip")
                     }, EXPORT_NATIVE_CRASH)
                 }
             }
             addAction(export)
         }
-        status = label("A23: Native emulator boot remains unverified.", 14f)
+        status = label("A24: Native emulator boot remains unverified.", 14f)
         label("IMPORTANT: Copied Windows computer name may still be YARDO/YARDO-B. Rename it to YARDOMOB and verify the NIC MAC before ANY network test.", 14f)
         val scroll = ScrollView(this).apply {
             isFillViewport = true
@@ -233,7 +233,7 @@ class WinKitSetupActivity : Activity() {
                         ?: error("Selected document provider returned no writable stream")
                     destination.use { out ->
                         ZipOutputStream(out).use { zip ->
-                            val summary = "WinKit A23 startup diagnostics (Game Link and video probes)\n" +
+                            val summary = "WinKit A24 startup diagnostics (embedded Game Link fix)\n" +
                                 "Native crash history: ${if (exit != null) "available" else "not retained"}\n" +
                                 "Process: ${exit?.processName ?: "unknown"}\n" +
                                 "Exit timestamp: ${exit?.timestamp ?: 0L}\n" +

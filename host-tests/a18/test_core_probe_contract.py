@@ -37,6 +37,12 @@ engine='''static void GUI_StartUp() {
         if (sdl.surface == NULL)
             E_Exit("Could not create the offscreen surface: %s", SDL_GetError());
     }
+    else if (!initgl) {
+        GFX_SetResizeable(true);
+        if (!GFX_SetSDLSurfaceWindow(640,400))
+            E_Exit("Could not initialize video: %s",SDL_GetError());
+        sdl.surface = SDL_GetWindowSurface(sdl.window);
+    }
     sdl.desktop.pixelFormat = SDL_GetWindowPixelFormat(sdl.window);
     LOG_MSG("SDL: Current window pixel format: %s", SDL_GetPixelFormatName((SDL_PixelFormat)sdl.desktop.pixelFormat));
     GFX_LogSDLState();
@@ -118,6 +124,12 @@ sdl.desktop.isperfect = false;
             ['c++', '-std=c++14', '-fsyntax-only', '-x', 'c++', '-'],
             input=snippet, text=True, capture_output=True, check=True)
         assert '#define WK_A22_GUI(s) winkit_a18_core_checkpoint(s)' in modified
+        for stage in range(67, 72):
+            assert f"WinKit A24 stage {stage}:" in modified
+        assert ('#if defined(__ANDROID__) && defined(RETRODOS_HOST_PROVIDES_MAIN)\\n'
+                '        if (retrodos_host_embedded()) {\\n'
+                '            sdl.gamelink.enable = true;').replace('\\n', '\n') in modified
+        assert modified.index('sdl.gamelink.enable = true;') < modified.index('OUTPUT_GAMELINK_Select();')
         assert 'WinKit A20 stage 20A: DOSBox-X wrapper entered' in modified
         assert '#error "WinKit Android must compile the embedded DOSBox-X entry"' in modified
     try: fn(modified)
@@ -139,9 +151,9 @@ activity=(root/"overlay/kotlin/WinKitSetupActivity.kt").read_text()
 assert 'Selected document provider returned no writable stream' in activity
 assert 'Could not open save destination' not in activity
 assert 'Diagnostic export failed (' in activity
-assert 'const val UI_RELEASE = "A23"' in activity
-assert 'WinKit-A23-startup-diagnostics.zip' in activity
-assert 'WinKit A23 startup diagnostics (Game Link and video probes)' in activity
+assert 'const val UI_RELEASE = "A24"' in activity
+assert 'WinKit-A24-startup-diagnostics.zip' in activity
+assert 'WinKit A24 startup diagnostics (embedded Game Link fix)' in activity
 assert 'setOnApplyWindowInsetsListener' in activity
 assert 'button.isAllCaps = false' in activity
 assert 'button.setSingleLine(false)' in activity
@@ -158,4 +170,4 @@ assert 'CXXFLAGS="-fPIC -O2 -g0 -DANDROID -DRETRODOS_HOST_PROVIDES_MAIN"' in bui
 build_recipe=(root/"scripts/BUILD_A10_ANDROID.sh").read_text()
 assert "WinKit A20 stage 20A: DOSBox-X wrapper entered" in build_recipe
 assert "WinKit A18 stage 21: engine main entered" in build_recipe
-print("PASS A23 Game Link and graphics startup probes, Android entry and diagnostics")
+print("PASS A24 embedded Game Link activation, graphics path checks, Android entry and diagnostics")

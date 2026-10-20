@@ -462,6 +462,42 @@ def patch_core_sdlmain(data: str) -> str:
         '    SDL_SetWindowTitle(sdl.window,"DOSBox-X");',
         '    SDL_SetWindowTitle(sdl.window,"DOSBox-X");\n    WK_A22_GUI("WinKit A23 stage 66: SDL window title returned");',
         'A23 window title returned')
+    # A24: On embedded Android the frontend owns the single SDL window.
+    # Offline profile sets output=gamelink but may omit 'gamelink master'.
+    # Enable Game Link only for this embedded mode; never modify guest data.
+    data = replace_exact(data,
+        '    else if (output == "gamelink")\n'
+        '    {\n'
+        '        WK_A22_GUI("WinKit A23 stage 54: selecting Game Link");\n'
+        '        OUTPUT_GAMELINK_Select();',
+        '    else if (output == "gamelink")\n'
+        '    {\n'
+        '        WK_A22_GUI("WinKit A23 stage 54: selecting Game Link");\n'
+        '#if defined(__ANDROID__) && defined(RETRODOS_HOST_PROVIDES_MAIN)\n'
+        '        if (retrodos_host_embedded()) {\n'
+        '            sdl.gamelink.enable = true;\n'
+        '            WK_A22_GUI("WinKit A24 stage 67: embedded Game Link master enabled");\n'
+        '        }\n'
+        '#endif\n'
+        '        OUTPUT_GAMELINK_Select();',
+        'A24 Game Link master')
+    data = replace_exact(data,
+        '    if (!initgl && sdl.desktop.want_type == SCREEN_GAMELINK && retrodos_host_embedded()) {',
+        '    WK_A22_GUI("WinKit A24 stage 68: checking borrowed window branch");\n'
+        '#if defined(__ANDROID__) && defined(RETRODOS_HOST_PROVIDES_MAIN)\n'
+        '    if (initgl) WK_A22_GUI("WinKit A24 stage 69: initgl already true");\n'
+        '    if (retrodos_host_embedded() && sdl.desktop.want_type != SCREEN_GAMELINK)\n'
+        '        WK_A22_GUI("WinKit A24 stage 70: Game Link selection not active");\n'
+        '#endif\n'
+        '    if (!initgl && sdl.desktop.want_type == SCREEN_GAMELINK && retrodos_host_embedded()) {',
+        'A24 branch diagnostics')
+    data = replace_exact(data,
+        '    else if (!initgl) {\n'
+        '        GFX_SetResizeable(true);',
+        '    else if (!initgl) {\n'
+        '        WK_A22_GUI("WinKit A24 stage 71: fallback window path entered");\n'
+        '        GFX_SetResizeable(true);',
+        'A24 fallback diagnostics')
     # A20: the exported entry wrapper is the gap between stages 20 and 21.
     # Block Android builds that would silently compile out the engine probes.
     return replace_exact(data,
