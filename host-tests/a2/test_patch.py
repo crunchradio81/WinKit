@@ -96,10 +96,12 @@ class TestPatch(unittest.TestCase):
         fixture = ('TOOLCHAIN="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64"\n'
                    '-DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF\n'
                    '    cmake --build "$OUT/sdl3-build" -j"$JOBS"\n'
-                   'APP_LIBS="$HERE/app/libs"\n')
+                   'APP_LIBS="$HERE/app/libs"\n'
+                   'CXXFLAGS="-fPIC -O2 -g0 -DANDROID"\n')
         s=p.patch_build(fixture)
         self.assertIn('NDK_HOST_TAG',s)
         self.assertIn('SDL3-jar',s)
+        self.assertIn('-DRETRODOS_HOST_PROVIDES_MAIN',s)
         with self.assertRaises(ValueError):p.patch_build(s)
 
 if __name__=='__main__':unittest.main(verbosity=2)
