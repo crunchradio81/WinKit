@@ -48,6 +48,60 @@ inline bool read_profile(const std::string &path, std::string &out) {
     return ok;
 }
 
+// A25: WinKit's frontend already holds an exclusive flock for this guest HDD.
+// DOSBox-X defaults "locking disk image mount" to true, so its own second
+// flock (via fopen_lock) fails even in the same process. Disable ONLY that
+// redundant lock in the validated, disposable launch snapshot. Original
+// profiles and the guest disk are never rewritten.
+inline bool no_second_disk_lock(const std::string& validated, std::string& out) {
+    out.clear();
+    if (validated.empty() || validated.size() > MAX_PROFILE) return false;
+    auto trim = [](const std::string& s) {
+        const size_t a = s.find_first_not_of(" \t\r");
+        if (a == std::string::npos) return std::string();
+        const size_t b = s.find_last_not_of(" \t\r");
+        return s.substr(a, b - a + 1);
+    };
+    auto lower = [](std::string s) {
+        for (char& c : s) if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
+        return s;
+    };
+    bool in_dosbox = false, seen_dosbox = false;
+    size_t pos = 0;
+    while (pos < validated.size()) {
+        const size_t e = validated.find('\n', pos);
+        const size_t next = e == std::string::npos ? validated.size() : e + 1;
+        const std::string line = validated.substr(pos, next - pos);
+        const std::string normalized = lower(trim(line));
+        if (!normalized.empty() && normalized.front() == '[') {
+            const size_t end = normalized.find(']');
+            if (end != std::string::npos) {
+                if (in_dosbox) {
+                    if (!out.empty() && out.back() != '\n') out += '\n';
+                    out += "locking disk image mount=false\n";
+                    in_dosbox = false;
+                }
+                if (trim(normalized.substr(1, end - 1)) == "dosbox") {
+                    if (seen_dosbox) { out.clear(); return false; }
+                    seen_dosbox = in_dosbox = true;
+                }
+            }
+        }
+        const size_t eq = normalized.find('=');
+        if (!(in_dosbox && eq != std::string::npos &&
+              trim(normalized.substr(0, eq)) == "locking disk image mount"))
+            out += line;
+        pos = next;
+    }
+    if (!seen_dosbox) { out.clear(); return false; }
+    if (in_dosbox) {
+        if (!out.empty() && out.back() != '\n') out += '\n';
+        out += "locking disk image mount=false\n";
+    }
+    if (out.size() > MAX_PROFILE) { out.clear(); return false; }
+    return true;
+}
+
 class ValidatedLaunch {
     std::string snapshot_;
 public:
@@ -61,6 +115,8 @@ public:
             launch_text != prepared_text ||
             !winkit_raw::image_matches_profile(launch_text, disk_path,
                                                disk_fd, disk_bytes)) return;
+        std::string runtime_text;
+        if (!no_second_disk_lock(launch_text, runtime_text)) return;
         // mkstemp is atomic and cannot overwrite an existing guest/profile.
         const auto slash = disk_path.rfind('/');
         if (slash == std::string::npos) return;
@@ -71,9 +127,9 @@ public:
         name = tmpl.data();
         bool ok = true;
         size_t offset = 0;
-        while (offset < launch_text.size()) {
-            const ssize_t n = ::write(fd, launch_text.data() + offset,
-                                      launch_text.size() - offset);
+        while (offset < runtime_text.size()) {
+            const ssize_t n = ::write(fd, runtime_text.data() + offset,
+                                      runtime_text.size() - offset);
             if (n < 0 && errno == EINTR) continue;
             if (n <= 0) { ok = false; break; }
             offset += static_cast<size_t>(n);

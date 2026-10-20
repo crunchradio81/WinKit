@@ -157,9 +157,9 @@ activity=(root/"overlay/kotlin/WinKitSetupActivity.kt").read_text()
 assert 'Selected document provider returned no writable stream' in activity
 assert 'Could not open save destination' not in activity
 assert 'Diagnostic export failed (' in activity
-assert 'const val UI_RELEASE = "A24"' in activity
-assert 'WinKit-A24-startup-diagnostics.zip' in activity
-assert 'WinKit A24 startup diagnostics (embedded Game Link fix)' in activity
+assert 'const val UI_RELEASE = "A25"' in activity
+assert 'WinKit-A25-startup-diagnostics.zip' in activity
+assert 'WinKit A25 startup diagnostics (disk lease fix)' in activity
 assert 'setOnApplyWindowInsetsListener' in activity
 assert 'button.isAllCaps = false' in activity
 assert 'button.setSingleLine(false)' in activity

@@ -43,7 +43,12 @@ int main(int argc, char** argv) {
             CHECK(run.valid());
             CHECK(run.config_path() != generated);
             CHECK(run.config_path() != prepared);
-            CHECK(load(run.config_path()) == orig);
+            const std::string runtime_conf = load(run.config_path());
+            CHECK(runtime_conf != orig);
+            CHECK(runtime_conf.find("locking disk image mount=false") != std::string::npos);
+            CHECK(runtime_conf.find("locking disk image mount=true") == std::string::npos);
+            CHECK(load(prepared) == orig);
+            CHECK(load(generated) == orig);
             struct stat st{};
             CHECK(::stat(run.config_path().c_str(), &st) == 0);
             CHECK((st.st_mode & 0777) == 0400);
@@ -55,6 +60,16 @@ int main(int argc, char** argv) {
                 CHECK(another.config_path() != persistent);
             }
             CHECK(::access(persistent.c_str(), F_OK) == 0);
+        }
+        // Inhibiting the redundant emulator lock must not release the frontend lease.
+        CHECK(lease.acquired());
+        {
+            std::string rewritten;
+            CHECK(winkit_launch::no_second_disk_lock(
+                "[dosbox]\nlocking disk image mount=true\n[sdl]\noutput=gamelink\n", rewritten));
+            CHECK(rewritten.find("locking disk image mount=true") == std::string::npos);
+            CHECK(rewritten.find("locking disk image mount=false") != std::string::npos);
+            CHECK(!winkit_launch::no_second_disk_lock("[sdl]\noutput=gamelink\n", rewritten));
         }
         // Both per-run snapshots must have been removed after their worker scopes.
         CHECK([](const std::string& dir) {
