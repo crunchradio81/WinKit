@@ -23,14 +23,14 @@ class Integration(unittest.TestCase):
         s=(ROOT/'overlay/kotlin/OfflineSmokeFixture.kt').read_text()
         self.assertIn('"machines"',s)
         self.assertIn('none { it.exists()',s)
-        self.assertIn('Files.createLink(image.toPath(), stage.toPath())',s)
-        self.assertIn('Files.createLink(config.toPath(), stagedConf.toPath())',s)
-        self.assertIn('Files.createLink(marker.toPath(), stagedMarker.toPath())',s)
+        self.assertIn('NoReplacePublisher.publish(stage, image)',s)
+        self.assertIn('NoReplacePublisher.publish(stagedConf, config)',s)
+        self.assertIn('NoReplacePublisher.publish(stagedMarker, marker)',s)
         self.assertNotIn('.renameTo(',s)
-        self.assertLess(s.index('Files.createLink(image.toPath(), stage.toPath())'),
-                        s.index('Files.createLink(config.toPath(), stagedConf.toPath())'))
-        self.assertLess(s.index('Files.createLink(config.toPath(), stagedConf.toPath())'),
-                        s.index('Files.createLink(marker.toPath(), stagedMarker.toPath())'))
+        self.assertLess(s.index('NoReplacePublisher.publish(stage, image)'),
+                        s.index('NoReplacePublisher.publish(stagedConf, config)'))
+        self.assertLess(s.index('NoReplacePublisher.publish(stagedConf, config)'),
+                        s.index('NoReplacePublisher.publish(stagedMarker, marker)'))
     def test_artifact_media_absent(self):
         banned={'.img','.raw','.iso','.vhd','.vhdx','.vfd','.ima','.qcow2','.vdi','.vmdk'}
         source_files=[row.split('  ',1)[1] for row in (ROOT/'MANIFEST.sha256').read_text().splitlines()]

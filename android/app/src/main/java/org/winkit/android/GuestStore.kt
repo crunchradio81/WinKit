@@ -54,9 +54,8 @@ class GuestStore(private val privateFiles: File) {
             val actual = digestHex(sha.digest())
             require(actual.equals(expectedSha256, true)) { "Checksum mismatch; image rejected" }
             require(!dst.exists() && !dst.isSymbolicLink()) { "Destination appeared; image not installed" }
-            // A same-directory hard link is an atomic NO-REPLACE publish on app-private storage.
-            // Traditional rename could overwrite a destination created after the preceding check.
-            java.nio.file.Files.createLink(dst.toPath(), tmp.toPath())
+            // Android may deny hard links: exclusive, synced publication instead.
+            NoReplacePublisher.publish(tmp, dst)
             return@synchronized Receipt(dst, actual, total)
         } finally {
             if (tmp.exists()) tmp.delete()
@@ -65,4 +64,38 @@ class GuestStore(private val privateFiles: File) {
 
     // Java 8-compatible check: no following of the final path component.
     private fun File.isSymbolicLink(): Boolean = java.nio.file.Files.isSymbolicLink(toPath())
+}
+
+/** Exclusively publishes from a staged app-private file without optional Android hard links.
+ * This method does not publish OFFLINE_READY; callers write that marker LAST.
+ * A failed partial copy leaves a reserved unready destination; never delete it.
+ */
+internal object NoReplacePublisher {
+    fun publish(stage: File, destination: File) {
+        require(stage.parentFile.canonicalFile == destination.parentFile.canonicalFile) {
+            "Publication must stay in the same private directory"
+        }
+        require(stage.isFile && !java.nio.file.Files.isSymbolicLink(stage.toPath())) { "Invalid staged file" }
+        java.io.FileInputStream(stage).channel.use { input ->
+            java.nio.channels.FileChannel.open(destination.toPath(),
+                java.nio.file.StandardOpenOption.CREATE_NEW,
+                java.nio.file.StandardOpenOption.WRITE,
+                java.nio.file.LinkOption.NOFOLLOW_LINKS).use { output ->
+                val buffer = java.nio.ByteBuffer.allocateDirect(256 * 1024)
+                var copied = 0L
+                while (true) {
+                    buffer.clear()
+                    val n = input.read(buffer)
+                    if (n == -1) break
+                    if (n == 0) continue
+                    buffer.flip()
+                    while (buffer.hasRemaining()) output.write(buffer)
+                    copied = Math.addExact(copied, n.toLong())
+                }
+                output.force(true)
+                check(copied == stage.length()) { "Staged file changed during exclusive publication" }
+            }
+        }
+        // Crash/IO failure leaves reserved name; without OFFLINE_READY no guest boot.
+    }
 }

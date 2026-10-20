@@ -1,4 +1,5 @@
 import com.crownparkcomputing.retrodos.winkit.GuestStore
+import com.crownparkcomputing.retrodos.winkit.NoReplacePublisher
 import com.crownparkcomputing.retrodos.winkit.OfflineSmokeFixture
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -18,13 +19,14 @@ fun main() {
         val staged = File(base, ".stage")
         staged.writeText("A")
         probe.writeText("CRITICAL ORIGINAL")
-        try { Files.createLink(probe.toPath(), staged.toPath()); error("overwritten existing") }
+        try { NoReplacePublisher.publish(staged, probe); error("overwritten existing") }
         catch (_: FileAlreadyExistsException) { passed++ }
         ok(probe.readText() == "CRITICAL ORIGINAL", "preexisting file unchanged")
         staged.delete()
         probe.delete()
         staged.writeText("immutable bytes")
-        Files.createLink(probe.toPath(), staged.toPath())
+        NoReplacePublisher.publish(staged, probe)
+        ok(!Files.isSameFile(probe.toPath(), staged.toPath()), "published file is not a hard link")
         staged.delete()
         ok(probe.readText() == "immutable bytes", "stage deletion preserves published data")
         probe.delete()

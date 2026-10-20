@@ -46,7 +46,7 @@ object OfflineSmokeFixture {
                 f.write(sector)
                 f.fd.sync()
             }
-            Files.createLink(image.toPath(), stage.toPath()) // atomic NO-REPLACE publication
+            NoReplacePublisher.publish(stage, image) // exclusive, synced publication without hard links
             require(OfflineDiskGeometry.matches(profile, image))
             // No marker exists until both image and offline config are safely present.
             val stagedConf=File(machines,".winkit-a5-config-${UUID.randomUUID()}.partial")
@@ -55,7 +55,7 @@ object OfflineSmokeFixture {
                 FileOutputStream(stagedConf).use { f ->
                     f.write(profile.toByteArray(Charsets.UTF_8)); f.fd.sync()
                 }
-                Files.createLink(config.toPath(), stagedConf.toPath())
+                NoReplacePublisher.publish(stagedConf, config)
             } finally { if (stagedConf.exists()) stagedConf.delete() }
             val stagedMarker=File(machines,".winkit-a5-marker-${UUID.randomUUID()}.partial")
             require(stagedMarker.createNewFile())
@@ -63,7 +63,7 @@ object OfflineSmokeFixture {
                 FileOutputStream(stagedMarker).use { f ->
                     f.write("a2-offline\n".toByteArray(Charsets.US_ASCII)); f.fd.sync()
                 }
-                Files.createLink(marker.toPath(), stagedMarker.toPath())
+                NoReplacePublisher.publish(stagedMarker, marker)
             } finally { if (stagedMarker.exists()) stagedMarker.delete() }
             return image
         } finally { if (stage.exists()) stage.delete() }

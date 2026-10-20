@@ -137,7 +137,7 @@ class WinKitSetupActivity : Activity() {
             }
             container.addView(it)
         }
-        status = label("A5 source · offline BIOS test generator available; core/APK not built or device boot verified.", 14f)
+        status = label("A11 ARM64 APK compiled; standalone BIOS guest boot still UNVERIFIED.", 14f)
         label("IMPORTANT: Copied Windows computer name may still be YARDO/YARDO-B. Rename it to YARDOMOB and verify the NIC MAC before ANY network test.", 14f)
         val scroll = ScrollView(this)
         scroll.addView(container)
@@ -207,7 +207,7 @@ class WinKitSetupActivity : Activity() {
                             stream.write(converted.toByteArray(StandardCharsets.UTF_8))
                             stream.fd.sync()
                         }
-                        java.nio.file.Files.createLink(offlineConf.toPath(), tmp.toPath())
+                        NoReplacePublisher.publish(tmp, offlineConf)
                         // The native frontend discovers WinKit only after this marker exists.
                         // Never create it earlier, and never create it if conversion failed.
                         val marker = File(machineDir, "OFFLINE_READY")
@@ -218,7 +218,7 @@ class WinKitSetupActivity : Activity() {
                                 output.write("a2-offline\n".toByteArray(StandardCharsets.US_ASCII))
                                 output.fd.sync()
                             }
-                            java.nio.file.Files.createLink(marker.toPath(), stagedMarker.toPath())
+                            NoReplacePublisher.publish(stagedMarker, marker)
                         } finally { if (stagedMarker.exists()) stagedMarker.delete() }
                     } finally { if (tmp.exists()) tmp.delete() }
                     "Offline configuration created. Review it before launching. No networking is available."
