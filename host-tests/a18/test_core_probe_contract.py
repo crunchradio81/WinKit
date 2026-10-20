@@ -11,7 +11,20 @@ extern "C" int retrodos_host_run(int argc, char **argv) {
     g_running.store(true);
     const int rc = dosbox_x_main(argc, argv);
 }'''
-engine='''#if defined(RETRODOS_HOST_PROVIDES_MAIN)
+engine='''static void GUI_StartUp() {
+    DOSBoxMenu::item *item;
+    AddExitFunction(AddExitFunctionFuncPair(GUI_ShutDown));
+    GUI_LoadFonts();
+    GFX_SetIcon();
+    SetPriority(sdl.priority.focus); //Assume focus on startup
+    /* Get some Event handlers */
+    const int display = section->Get_int("display");
+    // output type selection
+    SetWindowTransparency(section->Get_int("transparency"));
+    UpdateWindowDimensions();
+    ApplyPreventCap();
+}
+#if defined(RETRODOS_HOST_PROVIDES_MAIN)
 int dosbox_x_engine_main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {
     CommandLine com_line(argc,argv);
     Config myconf(&com_line);
@@ -53,6 +66,9 @@ for fn, source, milestones in (
     if fn == p.patch_core_sdlmain:
         for stage in "ABCDEFGHI":
             assert f"WinKit A21 stage 26{stage}:" in modified, stage
+        for stage in range(40, 52):
+            assert f"WinKit A22 stage {stage}:" in modified, stage
+        assert '#define WK_A22_GUI(s) winkit_a18_core_checkpoint(s)' in modified
         assert 'WinKit A20 stage 20A: DOSBox-X wrapper entered' in modified
         assert '#error "WinKit Android must compile the embedded DOSBox-X entry"' in modified
     try: fn(modified)
@@ -74,9 +90,9 @@ activity=(root/"overlay/kotlin/WinKitSetupActivity.kt").read_text()
 assert 'Selected document provider returned no writable stream' in activity
 assert 'Could not open save destination' not in activity
 assert 'Diagnostic export failed (' in activity
-assert 'const val UI_RELEASE = "A21"' in activity
-assert 'WinKit-A21-startup-diagnostics.zip' in activity
-assert 'WinKit A21 startup diagnostics (A21 SDL preparation probes)' in activity
+assert 'const val UI_RELEASE = "A22"' in activity
+assert 'WinKit-A22-startup-diagnostics.zip' in activity
+assert 'WinKit A22 startup diagnostics (GUI_StartUp probes)' in activity
 assert 'setOnApplyWindowInsetsListener' in activity
 assert 'button.isAllCaps = false' in activity
 assert 'button.setSingleLine(false)' in activity
@@ -93,4 +109,4 @@ assert 'CXXFLAGS="-fPIC -O2 -g0 -DANDROID -DRETRODOS_HOST_PROVIDES_MAIN"' in bui
 build_recipe=(root/"scripts/BUILD_A10_ANDROID.sh").read_text()
 assert "WinKit A20 stage 20A: DOSBox-X wrapper entered" in build_recipe
 assert "WinKit A18 stage 21: engine main entered" in build_recipe
-print("PASS A21 SDL startup checkpoints, Android entry flags and diagnostics")
+print("PASS A22 GUI startup checkpoints, SDL preparation, Android entry flags and diagnostics")

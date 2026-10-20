@@ -293,6 +293,64 @@ def patch_core_sdlmain(data: str) -> str:
     # A21: instrument the region after SDL_Init and before machine startup.
     # Each anchor is pinned to one exact upstream statement; do not move SDL
     # calls to a different thread or change the emulated disk at this stage.
+    # A22: GUI_StartUp runs on the emulator worker thread in embedded mode.
+    # Instrument the pinned inner function, not just the call site.
+    data = replace_exact(data,
+        'static void GUI_StartUp() {\n'
+        '    DOSBoxMenu::item *item;',
+        '#if defined(__ANDROID__) && defined(RETRODOS_HOST_PROVIDES_MAIN)\n'
+        'extern "C" void winkit_a18_core_checkpoint(const char *stage);\n'
+        '#define WK_A22_GUI(s) winkit_a18_core_checkpoint(s)\n'
+        '#else\n#define WK_A22_GUI(s) ((void)0)\n#endif\n'
+        'static void GUI_StartUp() {\n'
+        '    WK_A22_GUI("WinKit A22 stage 40: GUI_StartUp entered");\n'
+        '    DOSBoxMenu::item *item;',
+        'A22 GUI function entry')
+    data = replace_exact(data,
+        '    AddExitFunction(AddExitFunctionFuncPair(GUI_ShutDown));\n'
+        '    GUI_LoadFonts();',
+        '    AddExitFunction(AddExitFunctionFuncPair(GUI_ShutDown));\n'
+        '    WK_A22_GUI("WinKit A22 stage 41: before GUI_LoadFonts");\n'
+        '    GUI_LoadFonts();\n'
+        '    WK_A22_GUI("WinKit A22 stage 42: GUI_LoadFonts returned");',
+        'A22 GUI fonts')
+    data = replace_exact(data,
+        '    GFX_SetIcon();',
+        '    WK_A22_GUI("WinKit A22 stage 43: before GFX_SetIcon");\n'
+        '    GFX_SetIcon();\n'
+        '    WK_A22_GUI("WinKit A22 stage 44: GFX_SetIcon returned");',
+        'A22 GUI icon')
+    data = replace_exact(data,
+        '    SetPriority(sdl.priority.focus); //Assume focus on startup',
+        '    WK_A22_GUI("WinKit A22 stage 45: before priority setup");\n'
+        '    SetPriority(sdl.priority.focus); //Assume focus on startup\n'
+        '    WK_A22_GUI("WinKit A22 stage 46: priority returned");',
+        'A22 GUI priority')
+    data = replace_exact(data,
+        '    /* Get some Event handlers */',
+        '    WK_A22_GUI("WinKit A22 stage 47: before mapper handlers");\n'
+        '    /* Get some Event handlers */',
+        'A22 GUI handlers')
+    data = replace_exact(data,
+        '    const int display = section->Get_int("display");',
+        '    WK_A22_GUI("WinKit A22 stage 48: before display selection");\n'
+        '    const int display = section->Get_int("display");',
+        'A22 GUI display')
+    data = replace_exact(data,
+        '    // output type selection',
+        '    WK_A22_GUI("WinKit A22 stage 49: before output selection");\n'
+        '    // output type selection',
+        'A22 GUI output')
+    data = replace_exact(data,
+        '    SetWindowTransparency(section->Get_int("transparency"));\n'
+        '    UpdateWindowDimensions();\n'
+        '    ApplyPreventCap();\n}',
+        '    WK_A22_GUI("WinKit A22 stage 50: before window finalization");\n'
+        '    SetWindowTransparency(section->Get_int("transparency"));\n'
+        '    UpdateWindowDimensions();\n'
+        '    ApplyPreventCap();\n'
+        '    WK_A22_GUI("WinKit A22 stage 51: GUI_StartUp returning");\n}',
+        'A22 GUI exit')
     data = replace_exact(data,
         '        /* -- -- other steps to prepare SDL window/output */\n'
         '        SDL_Prepare();',
