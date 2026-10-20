@@ -47,8 +47,8 @@ class WinKitSetupActivity : Activity() {
             it.setPadding(0, 10, 0, 10)
             container.addView(it)
         }
-        label("WinKit 3.11 · A13 Offline Diagnostic", 24f)
-        label("A13 native guest gate reporting enabled. BIOS boot is not yet verified.", 14f)
+        label("WinKit 3.11 · A14 Android Path Alias Fix", 24f)
+        label("A14 verified-path gate: native boot and BIOS display remain UNVERIFIED.", 14f)
         val prefs = getSharedPreferences("winkit-machine-identity", MODE_PRIVATE)
         val proposedMac = prefs.getString("proposed_mac", null) ?: GuestIdentity.newLocalMac().also {
             prefs.edit().putString("proposed_mac", it).apply()

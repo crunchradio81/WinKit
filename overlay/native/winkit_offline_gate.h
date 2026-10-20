@@ -4,6 +4,10 @@
 #include <algorithm>
 #include <cctype>
 #include <climits>
+#include <cstdlib>
+#include <cstring>
+#include <limits.h>
+#include <sys/stat.h>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -47,13 +51,41 @@ inline bool geometry(const std::string &v) {
     }
     return count == 4 && !v.empty() && v.back() != ',';
 }
+// /data/user/0 and /data/data can be aliases for the same app-private
+// directory on Android. Keep strict literal matches for existing host fixtures;
+// different spellings require strong file-identity and canonical-path proofs.
+inline bool same_private_disk(const std::string &mounted, const std::string &trusted) {
+    if (mounted == trusted) return true;
+    const std::string suffix = "/machines/YARDOMOB.raw";
+    auto has_suffix = [&](const std::string &p) {
+        return p.size() >= suffix.size() &&
+            p.compare(p.size() - suffix.size(), suffix.size(), suffix) == 0;
+    };
+    if (!has_suffix(mounted) || !has_suffix(trusted) ||
+        mounted.empty() || mounted[0] != '/' ||
+        mounted.size() >= PATH_MAX || trusted.size() >= PATH_MAX ||
+        mounted.find("/../") != std::string::npos ||
+        mounted.find("/./") != std::string::npos ||
+        mounted.find("//") != std::string::npos) return false;
+    struct stat candidate{}, original{};
+    if (::lstat(mounted.c_str(), &candidate) != 0 ||
+        ::lstat(trusted.c_str(), &original) != 0 ||
+        !S_ISREG(candidate.st_mode) || !S_ISREG(original.st_mode) ||
+        candidate.st_nlink != 1 || original.st_nlink != 1 ||
+        candidate.st_dev != original.st_dev ||
+        candidate.st_ino != original.st_ino) return false;
+    char resolved_mounted[PATH_MAX]{}, resolved_trusted[PATH_MAX]{};
+    return ::realpath(mounted.c_str(), resolved_mounted) &&
+           ::realpath(trusted.c_str(), resolved_trusted) &&
+           std::strcmp(resolved_mounted, resolved_trusted) == 0;
+}
 inline bool image_mount_is_safe(const std::string &line, const std::string &disk) {
     std::vector<std::string> parts;
     if (!tokens(line, parts) || parts.size() != 9) return false;
     for (auto &part : parts) if (part.empty()) return false;
     // DOSBox-X IMGMOUNT 2 /private/... -t hdd -fs none -size b,s,h,c
     if (lower(parts[0]) != "imgmount" || (lower(parts[1]) != "2" && lower(parts[1]) != "c") ||
-        parts[2] != disk) return false;
+        !same_private_disk(parts[2], disk)) return false;
     bool type = false, fs = false, size = false;
     for (size_t i = 3; i < parts.size();) {
         if (i + 1 >= parts.size()) return false;
