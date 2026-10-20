@@ -230,11 +230,31 @@ def patch_frontend(data: str) -> str:
 #endif
 
 '''
-    return replace_exact(
+    data = replace_exact(
         data,
         '    /* ---- Opening straight onto one screen, for the store captures --------',
         autostart + '    /* ---- Opening straight onto one screen, for the store captures --------',
         'WinKit A12 launch after lambda')
+    # Kbd toggles the on-screen keyboard, not the launcher. Breadcrumbs tell
+    # whether the emulator worker is actually exiting at the same time.
+    # Synthetic unit-test frontends omit the UI, but the pinned checkout has it.
+    if 'if (ImGui::Button("Kbd")) {' in data:
+        data = replace_exact(data,
+            '                if (ImGui::Button("Kbd")) {',
+            '                if (ImGui::Button("Kbd")) {\n'
+            '#if defined(__ANDROID__)\n'
+            '                    winkit_a16_checkpoint("WinKit A25: Kbd tapped; toggling OSK");\n'
+            '#endif',
+            'A25 Kbd toggle checkpoint')
+    if '            if (g_engine_done.load()) {' in data:
+        data = replace_exact(data,
+            '            if (g_engine_done.load()) {',
+            '            if (g_engine_done.load()) {\n'
+            '#if defined(__ANDROID__)\n'
+            '                winkit_a16_checkpoint("WinKit A25: engine finished; returning to launcher");\n'
+            '#endif',
+            'A25 emulator worker completion checkpoint')
+    return data
 
 
 # A18: instrument ONLY the two pinned DOSBox-X startup files.
@@ -557,12 +577,21 @@ def patch_gradle(data: str) -> str:
     # freshly compiled file, so preserve those exact ELF bytes. Future
     # optimized/release packaging can use a separate authenticated build-id
     # strategy; do not weaken this strong debug-build provenance gate.
-    return replace_exact(data,
+    data = replace_exact(data,
                          '            useLegacyPackaging = true',
                          '            useLegacyPackaging = true\n'
                          '            // A10: preserve exact native ELF bytes for APK SHA-256 validation.\n'
                          '            keepDebugSymbols += "**/*.so"',
                          'preserve native ELF bytes in debug APK')
+    data = replace_exact(data,
+        '        debug {\n            isMinifyEnabled = false\n        }',
+        '        debug {\n            isMinifyEnabled = false\n'
+        '            if (keystoreConfig != null) signingConfig = signingConfigs.getByName("release")\n'
+        '        }', 'A25 stable debug signing')
+    return replace_exact(data,
+        'versionCode = DOSBOX_VERSION_CODE_BASE + 4',
+        'versionCode = System.getenv("WINKIT_ANDROID_VERSION_CODE")?.toIntOrNull() '
+        '?: (DOSBOX_VERSION_CODE_BASE + 4)', 'A25 monotonic Android version')
 
 
 def patch_build(data: str) -> str:

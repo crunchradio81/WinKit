@@ -64,6 +64,10 @@ class TestPatch(unittest.TestCase):
         self.assertIn('WinKit A15 stage 01:',s)
         self.assertIn('WinKit A15 stage 10:',s)
         self.assertIn('WinKit A15 stage 13:',s)
+        # The pinned full frontend adds Kbd/worker-exit evidence without
+        # changing the action of the keyboard button itself.
+        self.assertIn('WinKit A25: Kbd tapped;',loc.read_text())
+        self.assertIn('WinKit A25: engine finished;',loc.read_text())
         self.assertIn('static std::string winkit_native_probe',s)
         self.assertNotIn('cfg.wizard_done = true;',s)
         self.assertLess(s.index('auto launch =') if 'auto launch =' in s else 0, s.index('launch(candidate);'))
@@ -81,11 +85,17 @@ class TestPatch(unittest.TestCase):
                    '        jniLibs {\n'
                    '            useLegacyPackaging = true\n'
                    '        }\n'
-                   '    }\n')
+                   '    }\n'
+                   '        debug {\n'
+                   '            isMinifyEnabled = false\n'
+                   '        }\n'
+                   '        versionCode = DOSBOX_VERSION_CODE_BASE + 4\n')
         result = p.patch_gradle(fixture)
         self.assertIn('org.winkit.android.a2', result)
         self.assertIn('keepDebugSymbols += "**/*.so"', result)
         self.assertEqual(result.count('keepDebugSymbols += "**/*.so"'), 1)
+        self.assertIn('if (keystoreConfig != null) signingConfig = signingConfigs.getByName("release")',result)
+        self.assertIn('WINKIT_ANDROID_VERSION_CODE',result)
         with self.assertRaises(ValueError): p.patch_gradle(result)
         with self.assertRaises(ValueError): p.patch_gradle('applicationId = "something.else"')
         with self.assertRaises(ValueError): p.patch_gradle('applicationId = "com.dosboxx.app"')
