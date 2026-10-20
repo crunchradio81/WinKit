@@ -237,25 +237,25 @@ def patch_frontend(data: str) -> str:
         'WinKit A12 launch after lambda')
     # A26: lifecycle probes; never include guest state.
     data = replace_exact(data,
-        '                if (ImGui::Button("Kbd")) {\\n'
-        '                    show_osk = !show_osk;\\n',
-        '                if (ImGui::Button("Kbd")) {\\n'
-        '#if defined(__ANDROID__)\\n'
-        '                    winkit_a16_checkpoint("WinKit A26: keyboard toggle requested");\\n'
-        '#endif\\n'
-        '                    show_osk = !show_osk;\\n',
+        '                if (ImGui::Button("Kbd")) {\n'
+        '                    show_osk = !show_osk;\n',
+        '                if (ImGui::Button("Kbd")) {\n'
+        '#if defined(__ANDROID__)\n'
+        '                    winkit_a16_checkpoint("WinKit A26: keyboard toggle requested");\n'
+        '#endif\n'
+        '                    show_osk = !show_osk;\n',
         'A26 keyboard checkpoint')
     data = replace_exact(data,
-        '            if (g_engine_done.load()) {\\n'
-        '                if (engine.joinable()) engine.join();\\n',
-        '            if (g_engine_done.load()) {\\n'
-        '#if defined(__ANDROID__)\\n'
-        '                winkit_a16_checkpoint("WinKit A26: engine done observed before join");\\n'
-        '#endif\\n'
-        '                if (engine.joinable()) engine.join();\\n'
-        '#if defined(__ANDROID__)\\n'
-        '                winkit_a16_checkpoint("WinKit A26: engine joined; returning to launcher");\\n'
-        '#endif\\n',
+        '            if (g_engine_done.load()) {\n'
+        '                if (engine.joinable()) engine.join();\n',
+        '            if (g_engine_done.load()) {\n'
+        '#if defined(__ANDROID__)\n'
+        '                winkit_a16_checkpoint("WinKit A26: engine done observed before join");\n'
+        '#endif\n'
+        '                if (engine.joinable()) engine.join();\n'
+        '#if defined(__ANDROID__)\n'
+        '                winkit_a16_checkpoint("WinKit A26: engine joined; returning to launcher");\n'
+        '#endif\n',
         'A26 engine completion checkpoint')
     return data
 
