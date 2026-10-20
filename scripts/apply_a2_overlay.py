@@ -412,7 +412,7 @@ def patch_core_sdlmain(data: str) -> str:
         'A23 53: entering output selector')
     data = replace_exact(data,
         '    else if (output == "gamelink")\n    {\n        OUTPUT_GAMELINK_Select();',
-        '    WK_A22_GUI("WinKit A23 stage 54: selecting Game Link");\n    else if (output == "gamelink")\n    {\n        OUTPUT_GAMELINK_Select();',
+        '    else if (output == "gamelink")\n    {\n        WK_A22_GUI("WinKit A23 stage 54: selecting Game Link");\n        OUTPUT_GAMELINK_Select();',
         'A23 54: selecting Game Link')
     data = replace_exact(data,
         '    sdl.overscan_width=(unsigned int)section->Get_int("overscan");',

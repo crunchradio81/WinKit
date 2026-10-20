@@ -2,6 +2,7 @@
 """A18 offline regression: exact pinned core hooks and guarded diagnostics."""
 from pathlib import Path
 import importlib.util
+import subprocess
 root=Path(__file__).resolve().parents[2]
 spec=importlib.util.spec_from_file_location("winkit_overlay",root/"scripts/apply_a2_overlay.py")
 p=importlib.util.module_from_spec(spec); spec.loader.exec_module(p)
@@ -91,6 +92,31 @@ for fn, source, milestones in (
             assert f"WinKit A22 stage {stage}:" in modified, stage
         for stage in range(52, 67):
             assert f"WinKit A23 stage {stage}:" in modified, stage
+        # Regression for failed GitHub Actions build #25: do not insert a
+        # diagnostic statement between a completed 'if' and its 'else if'.
+        gamelink_arm = """    else if (output == "gamelink")
+    {
+        WK_A22_GUI("WinKit A23 stage 54: selecting Game Link");
+        OUTPUT_GAMELINK_Select();"""
+        assert gamelink_arm in modified
+        assert ('WK_A22_GUI("WinKit A23 stage 54: selecting Game Link");' +
+                chr(10) + '    else if') not in modified
+        # Syntax-check the transformed test fixture's output-selection chain.
+        selector = modified.split(
+            '    sdl.desktop.isperfect = false; /* Reset before selection */', 1
+        )[1].split('    sdl.overscan_width=', 1)[0]
+        snippet = """#include <string>
+#define WK_A22_GUI(s) ((void)0)
+struct { struct { bool isperfect; } desktop; } sdl;
+std::string output = "gamelink";
+void OUTPUT_SURFACE_Select() {}
+void OUTPUT_GAMELINK_Select() {}
+void verify_selector() {
+sdl.desktop.isperfect = false;
+""" + selector + chr(10) + "}" + chr(10)
+        subprocess.run(
+            ['c++', '-std=c++14', '-fsyntax-only', '-x', 'c++', '-'],
+            input=snippet, text=True, capture_output=True, check=True)
         assert '#define WK_A22_GUI(s) winkit_a18_core_checkpoint(s)' in modified
         assert 'WinKit A20 stage 20A: DOSBox-X wrapper entered' in modified
         assert '#error "WinKit Android must compile the embedded DOSBox-X entry"' in modified
