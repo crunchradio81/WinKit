@@ -87,6 +87,7 @@ A16_CHECKPOINT_CPP = r'''
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+static std::atomic<SDL_Window*> winkit_a17_window{nullptr};
 static void winkit_a16_checkpoint(const char *stage) {
     SDL_Log("%s", stage);
     const char *root = SDL_GetAndroidInternalStoragePath();
@@ -143,6 +144,14 @@ def patch_frontend(data: str) -> str:
     const char *privateRoot = SDL_GetAndroidInternalStoragePath();
     const std::string machineRoot = privateRoot ? std::string(privateRoot) + "/machines" : "";
     if (!machineRoot.empty() && workdir == machineRoot) {
+        SDL_Window *borrowed = winkit_a17_window.load(std::memory_order_acquire);
+        if (!borrowed) {
+            winkit_a16_checkpoint("WinKit A17 blocked: missing SDL window");
+            g_engine_done.store(true);
+            return;
+        }
+        retrodos_host_set_window(borrowed);
+        winkit_a16_checkpoint("WinKit A17: borrowed SDL window handed to core");
         winkit_lease::ImageLease lease(machineRoot + "/YARDOMOB.raw");
         if (!lease.acquired()) {
             LOGI("WinKit A3: guest image not safe/exclusively available; boot blocked");
@@ -175,6 +184,7 @@ def patch_frontend(data: str) -> str:
         winkit_a16_checkpoint("WinKit A15 stage 13: entering DOSBox-X core");
         retrodos_host_run(5, argv);
         winkit_a16_checkpoint("WinKit A15 stage 14: DOSBox-X core returned");
+        retrodos_host_set_window(nullptr);
         g_engine_done.store(true);
         return; // lease scope ends here, after core shutdown
     }
@@ -197,6 +207,8 @@ def patch_frontend(data: str) -> str:
                 candidate.name == "WinKit 3.11 - YARDOMOB (OFFLINE)" &&
                 candidate.dir == cfg_dir + "/machines" &&
                 !candidate.conf_override.empty()) {
+                winkit_a17_window.store(win, std::memory_order_release);
+                winkit_a16_checkpoint("WinKit A17: frontend window recorded");
                 winkit_a16_checkpoint("WinKit A15 stage 01: found validated YARDOMOB; calling launch");
                 launch(candidate);
                 winkit_a16_checkpoint("WinKit A15 stage 02: launch returned to frontend");

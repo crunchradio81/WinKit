@@ -32,7 +32,7 @@ object OfflineSmokeFixture {
                 String(sector, Charsets.US_ASCII).contains("WINKIT A4 BIOS HDD BOOT OK")) {
             "Invalid embedded GPL test sector"
         }
-        val profile = "[dosbox]\nmemsize=16\nworking directory option=noprompt\n"+
+        val profile = "[sdl]\noutput=gamelink\n"+"[dosbox]\nmemsize=16\nworking directory option=noprompt\n"+
                 "[ne2000]\nne2000=false\n[ipx]\nipx=false\n"+
                 "[autoexec]\n@echo off\n"+
                 "IMGMOUNT 2 \"${image.absolutePath}\" -t hdd -fs none -size $GEOMETRY\nBOOT C:\n"

@@ -15,6 +15,7 @@ fun main(args: Array<String>) {
         check(img.length() == OfflineSmokeFixture.IMAGE_BYTES)
         check(config.isFile && marker.readText() == "a2-offline\n")
         check(OfflineDiskGeometry.matches(config.readText(),img))
+        check(config.readText().contains("[sdl]\noutput=gamelink\n"))
         check(img.inputStream().use { data ->
             val hash = MessageDigest.getInstance("SHA-256")
             val buf=ByteArray(65536)
