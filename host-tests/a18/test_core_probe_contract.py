@@ -103,6 +103,12 @@ for fn, source, milestones in (
         gamelink_arm = """    else if (output == "gamelink")
     {
         WK_A22_GUI("WinKit A23 stage 54: selecting Game Link");
+#if defined(__ANDROID__) && defined(RETRODOS_HOST_PROVIDES_MAIN)
+        if (retrodos_host_embedded()) {
+            sdl.gamelink.enable = true;
+            WK_A22_GUI("WinKit A24 stage 67: embedded Game Link master enabled");
+        }
+#endif
         OUTPUT_GAMELINK_Select();"""
         assert gamelink_arm in modified
         assert ('WK_A22_GUI("WinKit A23 stage 54: selecting Game Link");' +
