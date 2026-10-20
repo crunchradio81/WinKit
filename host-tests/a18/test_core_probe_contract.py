@@ -177,3 +177,8 @@ build_recipe=(root/"scripts/BUILD_A10_ANDROID.sh").read_text()
 assert "WinKit A20 stage 20A: DOSBox-X wrapper entered" in build_recipe
 assert "WinKit A18 stage 21: engine main entered" in build_recipe
 print("PASS A24 embedded Game Link activation, graphics path checks, Android entry and diagnostics")
+
+# A26: ensure keyboard event and core-exit transitions have distinct checkpoints.
+a26 = (root/"scripts/apply_a2_overlay.py").read_text()
+for marker in ("WinKit A26: keyboard toggle requested", "WinKit A26: engine done observed before join", "WinKit A26: engine joined; returning to launcher"):
+    assert marker in a26
