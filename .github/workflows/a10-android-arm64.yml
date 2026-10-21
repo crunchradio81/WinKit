@@ -55,35 +55,6 @@ jobs:
         uses: android-actions/setup-android@v4
         with:
           packages: ''
-      - name: Require persistent WinKit Android signing key
-        shell: bash
-        env:
-          WK_STORE_B64: ${{ secrets.WINKIT_SIGNING_KEYSTORE_B64 }}
-          WK_STORE_PASSWORD: ${{ secrets.WINKIT_SIGNING_STORE_PASSWORD }}
-          WK_KEY_ALIAS: ${{ secrets.WINKIT_SIGNING_KEY_ALIAS }}
-          WK_KEY_PASSWORD: ${{ secrets.WINKIT_SIGNING_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          for key in WK_STORE_B64 WK_STORE_PASSWORD WK_KEY_ALIAS WK_KEY_PASSWORD; do
-            if [[ -z "${!key:-}" ]]; then
-              echo "Missing WinKit update-signing secret: $key" >&2
-              echo "Run scripts/SETUP_ANDROID_UPDATE_KEY_TERMUX.sh from the Android source branch." >&2
-              exit 2
-            fi
-          done
-          umask 077
-          STORE="$RUNNER_TEMP/winkit-update.jks"
-          printf '%s' "$WK_STORE_B64" | base64 --decode > "$STORE"
-          test -s "$STORE"
-          keytool -list -keystore "$STORE" -alias "$WK_KEY_ALIAS" -storepass "$WK_STORE_PASSWORD" >/dev/null
-          {
-            echo "ANDROID_KEYSTORE_PATH=$STORE"
-            echo "ANDROID_KEYSTORE_PASSWORD=$WK_STORE_PASSWORD"
-            echo "ANDROID_KEY_ALIAS=$WK_KEY_ALIAS"
-            echo "ANDROID_KEY_PASSWORD=$WK_KEY_PASSWORD"
-            echo "WINKIT_ANDROID_VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER))"
-          } >> "$GITHUB_ENV"
-          echo "WinKit persistent signer validated. Private keystore is outside checkout and artifacts."
       - name: Install Linux and Android prerequisites
         shell: bash
         run: |
@@ -110,6 +81,35 @@ jobs:
           set -euo pipefail
           cd "$WINKIT_SOURCE_ROOT"
           bash scripts/BUILD_A10_ANDROID.sh 2>&1 | tee "$RUNNER_TEMP/a10-android-build.log"
+      - name: Require persistent signer before distributing upgrade APK
+        shell: bash
+        env:
+          WK_STORE_B64: ${{ secrets.WINKIT_SIGNING_KEYSTORE_B64 }}
+          WK_STORE_PASSWORD: ${{ secrets.WINKIT_SIGNING_STORE_PASSWORD }}
+          WK_KEY_ALIAS: ${{ secrets.WINKIT_SIGNING_KEY_ALIAS }}
+          WK_KEY_PASSWORD: ${{ secrets.WINKIT_SIGNING_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for key in WK_STORE_B64 WK_STORE_PASSWORD WK_KEY_ALIAS WK_KEY_PASSWORD; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "Missing WinKit update-signing secret: $key" >&2
+              echo "Persistent signing key must match existing installed APK; do not uninstall to work around this." >&2
+              exit 2
+            fi
+          done
+          umask 077
+          STORE="$RUNNER_TEMP/winkit-update.jks"
+          printf '%s' "$WK_STORE_B64" | base64 --decode > "$STORE"
+          test -s "$STORE"
+          keytool -list -keystore "$STORE" -alias "$WK_KEY_ALIAS" -storepass "$WK_STORE_PASSWORD" >/dev/null
+          {
+            echo "ANDROID_KEYSTORE_PATH=$STORE"
+            echo "ANDROID_KEYSTORE_PASSWORD=$WK_STORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$WK_KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$WK_KEY_PASSWORD"
+            echo "WINKIT_ANDROID_VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER))"
+          } >> "$GITHUB_ENV"
+          echo "WinKit persistent signer validated. Private keystore is outside checkout and artifacts."
       - name: Verify APK signer and update version
         shell: bash
         run: |
