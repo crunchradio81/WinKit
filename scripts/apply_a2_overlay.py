@@ -578,14 +578,9 @@ def patch_manifest(data: str) -> str:
     # but external applications may not jump past the import gate.
     data = replace_exact(data, 'android:name=".MainActivity"\n            android:label="WinKit 3.11"\n            android:exported="true"',
                          'android:name=".MainActivity"\n            android:label="WinKit 3.11"\n            android:exported="false"', 'emulator activity export')
-    # A28: keep portrait-friendly setup, rotate only SDL emulator to landscape.
-    # The renderer's existing aspect-correct fit() preserves DOS pixel geometry.
-    data = replace_exact(data,
-        'android:name=".MainActivity"\n            android:label="WinKit 3.11"\n            android:exported="false"',
-        'android:name=".MainActivity"\n            android:label="WinKit 3.11"\n'
-        '            android:screenOrientation="sensorLandscape"\n'
-        '            android:exported="false"',
-        'A28 emulator landscape orientation')
+    # Upstream MainActivity already has sensorLandscape; preserve it unchanged.
+    if data.count('android:screenOrientation="sensorLandscape"') != 1:
+        raise ValueError('Expected one upstream emulator landscape orientation')
     return data
 
 
