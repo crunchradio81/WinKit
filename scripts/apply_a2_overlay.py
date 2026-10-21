@@ -257,6 +257,16 @@ def patch_frontend(data: str) -> str:
         '                winkit_a16_checkpoint("WinKit A26: engine joined; returning to launcher");\n'
         '#endif\n',
         'A26 engine completion checkpoint')
+    # A27: Kbd toggles show_osk mid-frame; push/pop must use same snapshot.
+    data = replace_exact(data,
+        '                if (show_osk) ImGui::PushStyleColor(ImGuiCol_Button,',
+        '                const bool winkit_kbd_style_pushed = show_osk;\\n'
+        '                if (winkit_kbd_style_pushed) ImGui::PushStyleColor(ImGuiCol_Button,',
+        'A27 keyboard style snapshot')
+    data = replace_exact(data,
+        '                if (show_osk) ImGui::PopStyleColor();',
+        '                if (winkit_kbd_style_pushed) ImGui::PopStyleColor();',
+        'A27 keyboard style balance')
     return data
 
 
