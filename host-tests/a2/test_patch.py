@@ -23,8 +23,10 @@ void foo() {
 
     enum class View { Emulator };
     /* ---- Opening straight onto one screen, for the store captures --------
+                if (show_osk) ImGui::PushStyleColor(ImGuiCol_Button, color);
                 if (ImGui::Button("Kbd")) {
                     show_osk = !show_osk;
+                if (show_osk) ImGui::PopStyleColor();
                 }
             if (g_engine_done.load()) {
                 if (engine.joinable()) engine.join();
