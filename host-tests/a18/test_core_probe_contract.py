@@ -182,3 +182,9 @@ print("PASS A24 embedded Game Link activation, graphics path checks, Android ent
 a26 = (root/"scripts/apply_a2_overlay.py").read_text()
 for marker in ("WinKit A26: keyboard toggle requested", "WinKit A26: engine done observed before join", "WinKit A26: engine joined; returning to launcher"):
     assert marker in a26
+
+# A27: keyboard style stack uses one pre-toggle snapshot.
+patch_source=(root/"scripts/apply_a2_overlay.py").read_text()
+assert 'const bool winkit_kbd_style_pushed = show_osk;' in patch_source
+assert 'if (winkit_kbd_style_pushed) ImGui::PushStyleColor' in patch_source
+assert 'if (winkit_kbd_style_pushed) ImGui::PopStyleColor' in patch_source
