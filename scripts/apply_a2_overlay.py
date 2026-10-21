@@ -260,7 +260,7 @@ def patch_frontend(data: str) -> str:
     # A27: Kbd toggles show_osk mid-frame; push/pop must use same snapshot.
     data = replace_exact(data,
         '                if (show_osk) ImGui::PushStyleColor(ImGuiCol_Button,',
-        '                const bool winkit_kbd_style_pushed = show_osk;\\n'
+        '                const bool winkit_kbd_style_pushed = show_osk;\n'
         '                if (winkit_kbd_style_pushed) ImGui::PushStyleColor(ImGuiCol_Button,',
         'A27 keyboard style snapshot')
     data = replace_exact(data,
