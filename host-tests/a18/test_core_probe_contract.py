@@ -157,7 +157,7 @@ activity=(root/"overlay/kotlin/WinKitSetupActivity.kt").read_text()
 assert 'Selected document provider returned no writable stream' in activity
 assert 'Could not open save destination' not in activity
 assert 'Diagnostic export failed (' in activity
-assert 'const val UI_RELEASE = "A25"' in activity
+assert 'const val UI_RELEASE = "A26"' in activity
 assert 'WinKit-A26-startup-diagnostics.zip' in activity
 assert 'WinKit A26 startup diagnostics (keyboard lifecycle)' in activity
 assert 'setOnApplyWindowInsetsListener' in activity
