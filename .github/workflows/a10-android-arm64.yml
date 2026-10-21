@@ -81,11 +81,19 @@ jobs:
           set -euo pipefail
           cd "$WINKIT_SOURCE_ROOT"
           bash scripts/BUILD_A10_ANDROID.sh 2>&1 | tee "$RUNNER_TEMP/a10-android-build.log"
+      - name: Publish A26-named diagnostic APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$WINKIT_SOURCE_ROOT/_build_outputs"
+          test -s "$OUT/WinKit311-Android-A10-debug-DEVICE-UNVERIFIED.apk"
+          cp "$OUT/WinKit311-Android-A10-debug-DEVICE-UNVERIFIED.apk" "$OUT/WinKit311-Android-A26-debug-NOT-UPGRADE-SAFE.apk"
+          sha256sum "$OUT/WinKit311-Android-A26-debug-NOT-UPGRADE-SAFE.apk" > "$OUT/A26-BUILD-SHA256SUMS.txt"
       - name: Inspect compiled debug APK (diagnostic only)
         shell: bash
         run: |
           set -euo pipefail
-          APK="$WINKIT_SOURCE_ROOT/_build_outputs/WinKit311-Android-A10-debug-DEVICE-UNVERIFIED.apk"
+          APK="$WINKIT_SOURCE_ROOT/_build_outputs/WinKit311-Android-A26-debug-NOT-UPGRADE-SAFE.apk"
           test -s "$APK"
           APKSIGNER="$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner"
           AAPT2="$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt2"
@@ -118,7 +126,7 @@ jobs:
         with:
           name: WinKit311-A26-DEBUG-NOT-UPGRADE-SAFE-DEVICE-UNVERIFIED
           path: |
-            ${{ runner.temp }}/winkit-source/_build_outputs/WinKit311-Android-A10-debug-DEVICE-UNVERIFIED.apk
-            ${{ runner.temp }}/winkit-source/_build_outputs/A10-BUILD-SHA256SUMS.txt
+            ${{ runner.temp }}/winkit-source/_build_outputs/WinKit311-Android-A26-debug-NOT-UPGRADE-SAFE.apk
+            ${{ runner.temp }}/winkit-source/_build_outputs/A26-BUILD-SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
