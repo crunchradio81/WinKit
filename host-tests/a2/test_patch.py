@@ -81,6 +81,9 @@ class TestPatch(unittest.TestCase):
         self.assertIn('WinKitSetupActivity',s)
         self.assertIn('allowBackup="false"',s)
         self.assertNotIn('android.permission.INTERNET',s)
+        self.assertIn('android:screenOrientation="sensorLandscape"',s)
+        self.assertEqual(s.count('android:screenOrientation="sensorLandscape"'),1)
+        self.assertNotIn('android:screenOrientation="sensorLandscape"\n            android:exported="true"',s)
         self.assertEqual(s.count('android.intent.category.LAUNCHER'),1)
         with self.assertRaises(ValueError):p.patch_manifest(s)
     def test_gradle_unique(self):
