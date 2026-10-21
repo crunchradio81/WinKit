@@ -23,6 +23,12 @@ void foo() {
 
     enum class View { Emulator };
     /* ---- Opening straight onto one screen, for the store captures --------
+                if (ImGui::Button("Kbd")) {
+                    show_osk = !show_osk;
+                }
+            if (g_engine_done.load()) {
+                if (engine.joinable()) engine.join();
+            }
         if (!g.conf_override.empty()) {
             /* A machine's conf is its own, but the floppy drives on the
         }
