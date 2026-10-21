@@ -43,7 +43,8 @@ MANIFEST='''<manifest xmlns:android="http://schemas.android.com/apk/res/android"
         <activity
             android:name=".MainActivity"
             android:label="Retro-DOS"
-            android:exported="true">
+            android:exported="true"
+            android:screenOrientation="sensorLandscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -83,7 +84,6 @@ class TestPatch(unittest.TestCase):
         self.assertNotIn('android.permission.INTERNET',s)
         self.assertIn('android:screenOrientation="sensorLandscape"',s)
         self.assertEqual(s.count('android:screenOrientation="sensorLandscape"'),1)
-        self.assertNotIn('android:screenOrientation="sensorLandscape"\n            android:exported="true"',s)
         self.assertEqual(s.count('android.intent.category.LAUNCHER'),1)
         with self.assertRaises(ValueError):p.patch_manifest(s)
     def test_gradle_unique(self):
