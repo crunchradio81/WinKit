@@ -29,6 +29,12 @@ void engine() {
     // Model upstream frontend: this startup anchor is AFTER the launch lambda.
     auto launch = [&](const Game &candidate) {};
     /* ---- Opening straight onto one screen, for the store captures --------
+    if (ImGui::Button("Kbd")) {
+                    show_osk = !show_osk;
+    }
+            if (g_engine_done.load()) {
+                if (engine.joinable()) engine.join();
+            }
 }
 '''
         result=patch.patch_frontend(data)
