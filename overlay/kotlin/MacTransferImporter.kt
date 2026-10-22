@@ -45,7 +45,7 @@ internal object MacTransferImporter {
                 val hash = disk.getString("sha256")
                 require(bytes >= 512 && bytes % 512L == 0L && bytes <= 128L * 1024 * 1024 * 1024)
                 require(hashPattern.matches(hash))
-                require(bytes < StatFs(machines.path).availableBytes - 64L * 1024 * 1024) {
+                require(bytes <= (StatFs(machines.path).availableBytes - 64L * 1024 * 1024) / 2L) {
                     "Insufficient storage for private guest"
                 }
                 val readme = zip.nextEntry ?: error("Missing README")
@@ -54,21 +54,43 @@ internal object MacTransferImporter {
                 zip.closeEntry()
                 val entry = zip.nextEntry ?: error("Missing disk")
                 require(!entry.isDirectory && entry.name == ENTRY)
-                // The durable deny marker is created before a guest disk becomes visible.
-                // A failed import may leave it behind; recovery must be explicit.
-                val gateText = JSONObject().put("ethernet_enabled", false)
-                    .put("identity_verified", false).put("required_computer_name", "YARDOMOB")
-                    .put("clone_sha256", hash).toString(2)
-                require(gate.createNewFile()) { "Concurrent import gate" }
-                FileOutputStream(gate).use { f ->
-                    f.write(gateText.toByteArray(Charsets.UTF_8))
-                    f.fd.sync()
+                // Verify complete ZIP integrity (including CRC and extra-entry rejection)
+                // before allowing GuestStore to publish the disk.
+                val stage = File(machines, ".mac-transfer-${java.util.UUID.randomUUID()}.partial")
+                require(stage.createNewFile()) { "Cannot stage transferred disk" }
+                try {
+                    val digest = MessageDigest.getInstance("SHA-256")
+                    var copied = 0L
+                    FileOutputStream(stage).use { out ->
+                        val buffer = ByteArray(1024 * 1024)
+                        while (true) {
+                            val n = zip.read(buffer)
+                            if (n < 0) break
+                            if (n == 0) continue
+                            copied = Math.addExact(copied, n.toLong())
+                            require(copied <= bytes) { "Transfer exceeds declared size" }
+                            digest.update(buffer, 0, n)
+                            out.write(buffer, 0, n)
+                        }
+                        out.fd.sync()
+                    }
+                    zip.closeEntry() // checks ZIP CRC before disk publication
+                    require(zip.nextEntry == null) { "Unexpected ZIP entries" }
+                    val actualHash = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+                    require(copied == bytes && actualHash == hash) { "Transfer integrity mismatch" }
+                    val gateText = JSONObject().put("ethernet_enabled", false)
+                        .put("identity_verified", false).put("required_computer_name", "YARDOMOB")
+                        .put("clone_sha256", hash).toString(2)
+                    require(gate.createNewFile()) { "Concurrent import gate" }
+                    FileOutputStream(gate).use { f ->
+                        f.write(gateText.toByteArray(Charsets.UTF_8))
+                        f.fd.sync()
+                    }
+                    val receipt = stage.inputStream().use { store.importVerified(it, hash, bytes) }
+                    return Receipt(receipt.bytes, receipt.sha256)
+                } finally {
+                    stage.delete()
                 }
-                val receipt = store.importVerified(zip, hash, bytes)
-                zip.closeEntry()
-                require(zip.nextEntry == null) { "Unexpected ZIP entries" }
-                require(receipt.bytes == bytes && receipt.sha256.equals(hash, true))
-                return Receipt(receipt.bytes, receipt.sha256)
             }
         } ?: error("Unable to read selected Mac transfer ZIP")
     }
