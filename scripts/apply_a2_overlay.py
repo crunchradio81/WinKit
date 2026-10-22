@@ -12,7 +12,7 @@ import re
 
 APP_SHA = '65e8c67ed4d8e5aacabc4b96337e8d47ac92d720'
 CORE_SHA = '4167c3aca0953e8b2af8ee3b63c94e6bdb2cfe11'
-APP_ID = 'org.winkit.android.a2'
+APP_ID = 'org.winkit.android.a29transfer'
 ROOT = Path(__file__).resolve().parents[1]
 
 INSERT_AFTER = '''        if (games.empty() && retrodos::demo_prepare(demo_dir)) {'''
@@ -546,7 +546,7 @@ def patch_core_sdlmain(data: str) -> str:
 
 
 def patch_manifest(data: str) -> str:
-    if 'org.winkit.android.a2' in data or 'WinKitSetupActivity' in data:
+    if APP_ID in data or 'WinKitSetupActivity' in data:
         raise ValueError('Manifest already patched')
     if '<manifest xmlns:android=' not in data:
         raise ValueError('Not an Android manifest')
@@ -564,7 +564,7 @@ def patch_manifest(data: str) -> str:
         <activity
             android:name=".winkit.WinKitSetupActivity"
             android:exported="true"
-            android:label="WinKit 3.11">
+            android:label="WinKit A29 Transfer">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
