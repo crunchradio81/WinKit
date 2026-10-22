@@ -46,6 +46,36 @@ A later Mac exporter version can include an authenticated, reviewed boot-config 
 The pinned parent Retro-DOS commit is `65e8c67ed4d8e5aacabc4b96337e8d47ac92d720`; it points to DOSBox-X SDL3 submodule `4167c3aca0953e8b2af8ee3b63c94e6bdb2cfe11`.
 `CrownParkComputing/dosbox-x-sdl3` returned GitHub 404 at this integration pass. **Do not replace with unverified stock DOSBox-X.** Restore authorized access to the exact source, or prepare and independently validate an explicit source-porting plan.
 
+### Recovering the exact missing emulator core without repinning
+
+A29 supports an optional **public GitHub mirror/fork** containing the *same*
+DOSBox-X SDL3 commit `4167c3aca0953e8b2af8ee3b63c94e6bdb2cfe11`.
+This is not permission to build from a different DOSBox-X revision.
+
+In the Actions **A29 Mac Transfer** workflow, choose **Run workflow** and set
+`core_repository` to the public `owner/repository` of the restored Git
+repository. Leave the default if the original CrownParkComputing repository
+has become available again. Use a public repository slug only; no access
+tokens, full URLs or private credentials. If your recovered copy is private,
+arrange an authorized non-secret source publication rather than putting
+credentials in the workflow input.
+
+The `scripts/a29_core_source.py` check constrains the input, and
+`scripts/bootstrap_core.sh` sets the local submodule fetch URL while
+leaving the parent gitlink and expected core commit unchanged. The build
+aborts if the fetched core is not the exact pinned SHA. It additionally
+runs the exact-source overlay verification before publishing an APK.
+
+**If the original source is not presently available:** ask the Retro-DOS
+maintainer for an accessible clone/bundle that contains the pinned commit,
+including its reachable Git tree; an APK, unverified source snapshot, or
+ordinary DOSBox-X checkout is not a substitute. Previous successful
+GitHub Actions #42 preserved an APK, not a source checkout.
+
+Do not copy or publish private Mac guest images, licensed MS-DOS/Windows
+media, or any user files as part of source recovery. A29 remains a separate
+Android package, and this dependency workaround cannot modify A26 storage.
+
 Original diagnostics workflow: `.github/workflows/a10-android-arm64.yml`.
 Independent transfer build workflow: `.github/workflows/a29-mac-transfer-android-arm64.yml` on `main`, which checks out branch `android-a29-mac-transfer-isolated`, verifies the A29 package identity and offline transfer source before trying the emulator build, and marks compiled debug APKs device-unverified.
 
