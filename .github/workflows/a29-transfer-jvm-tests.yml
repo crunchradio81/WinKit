@@ -61,3 +61,16 @@ jobs:
           cd "$WINKIT_SOURCE_ROOT"
           bash scripts/RUN_A29_TRANSFER_TESTS.sh
           echo "No APK, guest image or emulator core was used or produced."
+      - name: Install Android API 36 platform (no NDK or DOSBox-X)
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+      - name: Compile real A29 Android Kotlin sources against SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'platforms;android-36'
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          cd "$WINKIT_SOURCE_ROOT"
+          bash scripts/RUN_A29_ANDROID_SOURCE_COMPILE.sh
+
