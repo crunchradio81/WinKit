@@ -47,5 +47,24 @@ class TestPinnedCoreRecovery(unittest.TestCase):
         self.assertNotIn("git checkout --force", bootstrap)
 
 
+    def test_source_vendor_workflow_is_exact_and_non_squashed(self):
+        importer = (ROOT / "scripts" / "VENDOR_A29_PINNED_CORE.sh").read_text()
+        bootstrap = (ROOT / "scripts" / "bootstrap_core.sh").read_text()
+        self.assertIn('CORE_SHA=4167c3aca0953e8b2af8ee3b63c94e6bdb2cfe11', importer)
+        self.assertIn('[[ -z "$(git -C "$ROOT" status --porcelain)" ]]', importer)
+        self.assertIn('git -C "$ROOT" subtree add --prefix="$PREFIX" "$CORE_SHA"', importer)
+        self.assertNotIn('--squash', importer)
+        self.assertIn('"$VENDORED_TREE" = "$ORIGINAL_TREE"', importer)
+        self.assertIn('git -C "$ROOT" cat-file -e "$CORE_SHA:include/retrodos_host.h"', importer)
+        self.assertIn('git -C "$ROOT" config submodule.core.url "$CORE_HISTORY"', bootstrap)
+        self.assertIn('git -C "$DEST" -c protocol.file.allow=always submodule update', bootstrap)
+        self.assertIn('"$VENDORED_TREE" = "$PINNED_TREE"', bootstrap)
+
+    def test_vendor_documentation_does_not_claim_a_guest_boot(self):
+        handoff = (ROOT / "docs" / "A29_NATIVE_CORE_SOURCE_OWNERSHIP.md").read_text()
+        self.assertIn("did not prove successful execution", handoff)
+        self.assertIn("NOT yet imported any actual SDL3 sources", handoff)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
