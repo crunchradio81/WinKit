@@ -23,7 +23,10 @@ jobs:
         with:
           gradle-version: '8.9'
       - name: Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+          log-accepted-android-sdk-licenses: 'false'
       - name: Install Linux and Android prerequisites
         shell: bash
         run: |
