@@ -1,0 +1,153 @@
+name: WinKit A29 Android ARM64 Mac Transfer (isolated; device unverified)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android-arm64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      ANDROID_API: '28'
+      ANDROID_ABI: arm64-v8a
+    steps:
+      - name: Checkout dedicated A29 transfer branch
+        uses: actions/checkout@v4
+        with:
+          ref: android-a29-mac-transfer-isolated
+      - name: Verify Android source branch and build entry point
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = android-a29-mac-transfer-isolated
+          test -f scripts/BUILD_A10_ANDROID.sh
+          test -f MANIFEST.sha256
+          echo "Compiling source from: $(git rev-parse HEAD) (android-a29-mac-transfer-isolated)"
+      - name: Prepare manifest-clean source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_ROOT="$RUNNER_TEMP/winkit-source"
+          mkdir -p "$SOURCE_ROOT"
+          git archive --format=tar HEAD | tar -xf - -C "$SOURCE_ROOT"
+          echo "WINKIT_SOURCE_ROOT=$SOURCE_ROOT" >> "$GITHUB_ENV"
+          # The integrity verifier is deliberately strict. Git metadata and
+          # build/test logs must remain OUTSIDE this source snapshot.
+          python3 "$SOURCE_ROOT/VERIFY_A10.py"
+      - name: Verify A29 transfer and inherited A26 keyboard diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$WINKIT_SOURCE_ROOT"
+          python3 host-tests/a18/test_core_probe_contract.py
+          grep -Fq 'WinKit A26: keyboard toggle requested' scripts/apply_a2_overlay.py
+          grep -Fq 'WinKit A26: engine joined; returning to launcher' scripts/apply_a2_overlay.py
+      - name: Verify A29 isolated transfer contract (offline host checks)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$WINKIT_SOURCE_ROOT"
+          python3 host-tests/a2/test_patch.py
+          grep -Fq "APP_ID = 'org.winkit.android.a29transfer'" scripts/apply_a2_overlay.py
+          grep -Fq 'object MacTransferImporter' overlay/kotlin/MacTransferImporter.kt
+          grep -Fq 'PICK_MAC_TRANSFER' overlay/kotlin/WinKitSetupActivity.kt
+          grep -Fq 'Import WinKit Mac transfer ZIP (RC24.6)' overlay/kotlin/WinKitSetupActivity.kt
+          echo "A29 isolated app identity and RC24.6 import entry point verified (host source only)."
+      - name: Verify pinned SDL3 core access before Android toolchain setup
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE_URL=https://github.com/CrownParkComputing/dosbox-x-sdl3.git
+          if ! GIT_TERMINAL_PROMPT=0 git ls-remote "$CORE_URL" HEAD >/dev/null 2>&1; then
+            echo "::error title=Required emulator source inaccessible::The original pinned SDL3 core repository is not publicly readable. Restore the authorized exact source at commit 4167c3aca0953e8b2af8ee3b63c94e6bdb2cfe11; do not substitute stock DOSBox-X."
+            exit 2
+          fi
+          echo "Core repository accessible; pinned commit verified later by bootstrap."
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Android SDK (current command-line tools)
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+      - name: Install Linux and Android prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake libtool build-essential cmake ninja-build pkg-config python3 zip unzip curl binutils
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install 'ndk;28.2.13676358' 'platforms;android-36' 'build-tools;36.0.0'
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+      - name: Pin host Kotlin compiler 2.0.21
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/winkit-kotlin"
+          curl --http1.1 --fail --location --retry 8 --retry-all-errors --retry-delay 5 --connect-timeout 30 --output "$RUNNER_TEMP/winkit-kotlin/compiler.zip" \
+            https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip
+          unzip -q "$RUNNER_TEMP/winkit-kotlin/compiler.zip" -d "$RUNNER_TEMP/winkit-kotlin"
+          echo "$RUNNER_TEMP/winkit-kotlin/kotlinc/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/winkit-kotlin/kotlinc/bin/kotlinc" -version
+          sha256sum "$RUNNER_TEMP/winkit-kotlin/compiler.zip" > "$RUNNER_TEMP/kotlin-compiler-sha256.txt"
+      - name: A10 atomic-publish + parity/boot + native/Gradle build attempt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$WINKIT_SOURCE_ROOT"
+          bash scripts/BUILD_A10_ANDROID.sh 2>&1 | tee "$RUNNER_TEMP/a10-android-build.log"
+      - name: Publish A29-named diagnostic APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$WINKIT_SOURCE_ROOT/_build_outputs"
+          test -s "$OUT/WinKit311-Android-A10-debug-DEVICE-UNVERIFIED.apk"
+          cp "$OUT/WinKit311-Android-A10-debug-DEVICE-UNVERIFIED.apk" "$OUT/WinKit311-Android-A29-ISOLATED-debug-NOT-UPGRADE-SAFE.apk"
+          sha256sum "$OUT/WinKit311-Android-A29-ISOLATED-debug-NOT-UPGRADE-SAFE.apk" > "$OUT/A29-BUILD-SHA256SUMS.txt"
+      - name: Inspect compiled debug APK (diagnostic only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$WINKIT_SOURCE_ROOT/_build_outputs/WinKit311-Android-A29-ISOLATED-debug-NOT-UPGRADE-SAFE.apk"
+          test -s "$APK"
+          APKSIGNER="$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner"
+          AAPT2="$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt2"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > "$RUNNER_TEMP/winkit-apk-verification.txt"
+          "$AAPT2" dump badging "$APK" > "$RUNNER_TEMP/winkit-apk-badging.txt"
+          grep -Fq "package: name='org.winkit.android.a29transfer'" "$RUNNER_TEMP/winkit-apk-badging.txt"
+          echo "Android debug APK package and signature verification passed."
+          echo "WARNING: A29 is separate from A26, but builds of A29 have no stable update signing key."
+          echo "Do not uninstall the working A26 app or existing private guest storage."
+      - name: Upload diagnostic logs (including failed builds)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinKit311-A29-Android-Build-Logs
+          path: |
+            ${{ runner.temp }}/a10-android-build.log
+            ${{ runner.temp }}/kotlin-compiler-sha256.txt
+            ${{ runner.temp }}/winkit-apk-verification.txt
+            ${{ runner.temp }}/winkit-apk-badging.txt
+            ${{ runner.temp }}/winkit-source/_external/Retro-Dosbox/android/build/tree-arm64-v8a/config.log
+            ${{ runner.temp }}/winkit-source/_external/Retro-Dosbox/android/build/arm64-v8a/sdl3-build/CMakeCache.txt
+            ${{ runner.temp }}/winkit-source/_external/Retro-Dosbox/android/build/arm64-v8a/sdl3-build/CMakeFiles/CMakeConfigureLog.yaml
+            ${{ runner.temp }}/winkit-source/_external/Retro-Dosbox/android/app/build/reports/
+            ${{ runner.temp }}/winkit-source/_external/Retro-Dosbox/android/app/build/outputs/logs/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload diagnostic APK after package checks (not upgrade-safe)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinKit311-A29-DEBUG-NOT-UPGRADE-SAFE-DEVICE-UNVERIFIED
+          path: |
+            ${{ runner.temp }}/winkit-source/_build_outputs/WinKit311-Android-A29-ISOLATED-debug-NOT-UPGRADE-SAFE.apk
+            ${{ runner.temp }}/winkit-source/_build_outputs/A29-BUILD-SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
