@@ -28,7 +28,7 @@ import java.util.zip.ZipOutputStream
 /** A2 source overlay: standalone source import + offline-only launch selector.
  * No real Ethernet, Tailscale sockets, Windows files or remote-desktop code. */
 class WinKitSetupActivity : Activity() {
-    private companion object { const val PICK_IMAGE = 0x3120; const val PICK_CONFIG = 0x3121; const val EXPORT_NATIVE_CRASH = 0x3122; const val PICK_MAC_TRANSFER = 0x3123; const val UI_RELEASE = "A26" }
+    private companion object { const val PICK_IMAGE = 0x3120; const val PICK_CONFIG = 0x3121; const val EXPORT_NATIVE_CRASH = 0x3122; const val PICK_MAC_TRANSFER = 0x3123; const val UI_RELEASE = "A29 Mac Transfer" }
     private val mainThread = Handler(Looper.getMainLooper())
     private val workers = Executors.newSingleThreadExecutor()
     private val store by lazy { GuestStore(filesDir) }
@@ -76,7 +76,7 @@ class WinKitSetupActivity : Activity() {
             container.addView(button, layout)
         }
         label("WinKit 3.11 Android · $UI_RELEASE", 23f)
-        label("A26 keyboard/engine exit diagnostics. Guest OS boot is not yet verified.", 14f)
+        label("A29 isolated private Mac guest transfer; guest DOS/Windows boot remains unverified.", 14f)
         val prefs = getSharedPreferences("winkit-machine-identity", MODE_PRIVATE)
         val proposedMac = prefs.getString("proposed_mac", null) ?: GuestIdentity.newLocalMac().also {
             prefs.edit().putString("proposed_mac", it).apply()
