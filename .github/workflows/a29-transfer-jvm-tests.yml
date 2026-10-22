@@ -35,6 +35,8 @@ jobs:
           python3 host-tests/a18/test_core_probe_contract.py
           python3 host-tests/a2/test_patch.py
           python3 host-tests/a29/test_core_source.py
+          bash -n scripts/bootstrap_core.sh
+          bash -n scripts/VENDOR_A29_PINNED_CORE.sh
           grep -Fq 'MacTransferDiskInstaller.install(' overlay/kotlin/MacTransferImporter.kt
           grep -Fq 'MacTransferArchiveVerifier.stage(' overlay/kotlin/MacTransferDiskInstaller.kt
           grep -Fq 'OFFLINE_READY' overlay/kotlin/MacTransferDiskInstaller.kt
