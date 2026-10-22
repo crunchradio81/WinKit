@@ -17,11 +17,15 @@ jobs:
       ANDROID_API: '28'
       ANDROID_ABI: arm64-v8a
       WINKIT_CORE_REPO: ${{ inputs.core_repository }}
+      WINKIT_CORE_HISTORY_GIT: ${{ github.workspace }}
     steps:
       - name: Checkout dedicated A29 transfer branch
         uses: actions/checkout@v4
         with:
           ref: android-a29-mac-transfer-isolated
+          # Non-squashed WinKit source vendor import retains exact DOSBox-X Git
+          # commit in ancestry. Shallow checkouts cannot expose that object.
+          fetch-depth: 0
       - name: Verify Android source branch and build entry point
         shell: bash
         run: |
@@ -61,18 +65,29 @@ jobs:
           grep -Fq 'PICK_MAC_TRANSFER' overlay/kotlin/WinKitSetupActivity.kt
           grep -Fq 'Import WinKit Mac transfer ZIP (RC24.6)' overlay/kotlin/WinKitSetupActivity.kt
           echo "A29 isolated app identity and RC24.6 import entry point verified (host source only)."
-      - name: Verify pinned SDL3 core access before Android toolchain setup
+      - name: Resolve pinned SDL3 from WinKit-owned source or restored remote
         shell: bash
         run: |
           set -euo pipefail
           cd "$WINKIT_SOURCE_ROOT"
-          CORE_URL="$(python3 scripts/a29_core_source.py "$WINKIT_CORE_REPO")"
-          echo "Checking public SDL3 source endpoint (exact gitlink commit remains pinned)."
-          if ! GIT_TERMINAL_PROMPT=0 git ls-remote --exit-code "$CORE_URL" HEAD >/dev/null 2>&1; then
-            echo "::error title=Required emulator source inaccessible::GitHub core source is inaccessible. Supply a public owner/repo containing the exact pinned commit 4167c3aca0953e8b2af8ee3b63c94e6bdb2cfe11 in the workflow input. Do not substitute a different core revision."
-            exit 2
+          CORE_SHA=4167c3aca0953e8b2af8ee3b63c94e6bdb2cfe11
+          if [[ -d vendor/dosbox-x-sdl3 ]]; then
+            git -C "$WINKIT_CORE_HISTORY_GIT" cat-file -e "$CORE_SHA^{commit}"
+            actual="$(git -C "$WINKIT_CORE_HISTORY_GIT" rev-parse "HEAD:vendor/dosbox-x-sdl3")"
+            expected="$(git -C "$WINKIT_CORE_HISTORY_GIT" rev-parse "$CORE_SHA^{tree}")"
+            [[ "$actual" = "$expected" ]] || {
+              echo "::error::Vendored source tree does not match the exact pinned commit."
+              exit 2
+            }
+            echo "PASS: full editable pinned SDL3 source is in WinKit history."
+          else
+            CORE_URL="$(python3 scripts/a29_core_source.py "$WINKIT_CORE_REPO")"
+            if ! GIT_TERMINAL_PROMPT=0 git ls-remote --exit-code "$CORE_URL" HEAD >/dev/null 2>&1; then
+              echo "::error::DOSBox-X SDL3 source not in WinKit and upstream is inaccessible. Use VENDOR_A29_PINNED_CORE.sh with an authorized complete source Git clone; cannot rebuild the original from an APK."
+              exit 2
+            fi
+            echo "Upstream SDL3 source accessible; bootstrap verifies pinned commit."
           fi
-          echo "Source endpoint reachable. Bootstrap must still verify exact commit."
       - name: Java 17
         uses: actions/setup-java@v4
         with:
