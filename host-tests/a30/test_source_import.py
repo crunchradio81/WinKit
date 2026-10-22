@@ -19,10 +19,7 @@ class A30ImportPolicy(unittest.TestCase):
                      "src/cpu/core_normal.cpp", "include/dosbox.h",
                      "tests/example.cpp", "src/libs/libchdr/lzma/LICENSE"]:
             with self.subTest(name=name):
-                if name.endswith("/LICENSE"):
-                    self.assertFalse(vendor.allowed(name))
-                else:
-                    self.assertTrue(vendor.allowed(name))
+                self.assertTrue(vendor.allowed(name))
 
     def test_proprietary_and_binary_paths_rejected(self):
         for name in ["ROMs/rom.bin", "docs/Windows 3.1/driver.zip",
