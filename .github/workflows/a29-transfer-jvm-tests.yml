@@ -1,6 +1,11 @@
 name: WinKit A29 Transfer JVM Tests (no emulator core)
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/a29-transfer-jvm-tests.yml'
 permissions:
   contents: read
 jobs:
@@ -30,7 +35,9 @@ jobs:
           python3 host-tests/a18/test_core_probe_contract.py
           python3 host-tests/a2/test_patch.py
           python3 host-tests/a29/test_core_source.py
-          grep -Fq 'MacTransferArchiveVerifier.stage(' overlay/kotlin/MacTransferImporter.kt
+          grep -Fq 'MacTransferDiskInstaller.install(' overlay/kotlin/MacTransferImporter.kt
+          grep -Fq 'MacTransferArchiveVerifier.stage(' overlay/kotlin/MacTransferDiskInstaller.kt
+          grep -Fq 'OFFLINE_READY' overlay/kotlin/MacTransferDiskInstaller.kt
       - name: Java 17
         uses: actions/setup-java@v4
         with:
