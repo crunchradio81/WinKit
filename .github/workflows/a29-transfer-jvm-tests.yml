@@ -1,0 +1,56 @@
+name: WinKit A29 Transfer JVM Tests (no emulator core)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  transfer-jvm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout isolated A29 transfer branch
+        uses: actions/checkout@v4
+        with:
+          ref: android-a29-mac-transfer-isolated
+      - name: Verify manifest-clean source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = android-a29-mac-transfer-isolated
+          ROOT="$RUNNER_TEMP/winkit-source"
+          mkdir -p "$ROOT"
+          git archive --format=tar HEAD | tar -xf - -C "$ROOT"
+          echo "WINKIT_SOURCE_ROOT=$ROOT" >> "$GITHUB_ENV"
+          python3 "$ROOT/VERIFY_A10.py"
+      - name: Verify A29 source contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$WINKIT_SOURCE_ROOT"
+          python3 host-tests/a18/test_core_probe_contract.py
+          python3 host-tests/a2/test_patch.py
+          python3 host-tests/a29/test_core_source.py
+          grep -Fq 'MacTransferArchiveVerifier.stage(' overlay/kotlin/MacTransferImporter.kt
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Kotlin compiler 2.0.21
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/kotlin"
+          curl --http1.1 --fail --location --retry 8 --retry-all-errors --retry-delay 5 --connect-timeout 30 \
+            --output "$RUNNER_TEMP/kotlin/compiler.zip" \
+            https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip
+          unzip -q "$RUNNER_TEMP/kotlin/compiler.zip" -d "$RUNNER_TEMP/kotlin"
+          echo "$RUNNER_TEMP/kotlin/kotlinc/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/kotlin/kotlinc/bin/kotlinc" -version
+      - name: Run actual Kotlin ZIP verifier tests (no DOSBox-X dependency)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$WINKIT_SOURCE_ROOT"
+          bash scripts/RUN_A29_TRANSFER_TESTS.sh
+          echo "No APK, guest image or emulator core was used or produced."
