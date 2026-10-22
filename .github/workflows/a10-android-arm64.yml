@@ -23,7 +23,10 @@ jobs:
         with:
           gradle-version: '8.9'
       - name: Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+          log-accepted-android-sdk-licenses: 'false'
       - name: Install Linux and Android prerequisites
         shell: bash
         run: |
@@ -44,6 +47,17 @@ jobs:
           echo "$RUNNER_TEMP/winkit-kotlin/kotlinc/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/winkit-kotlin/kotlinc/bin/kotlinc" -version
           sha256sum "$RUNNER_TEMP/winkit-kotlin/compiler.zip" > kotlin-compiler-sha256.txt
+      - name: Verify pinned DOSBox-X SDL3 core is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE_URL="https://github.com/CrownParkComputing/dosbox-x-sdl3.git"
+          echo "Checking availability of pinned Retro-DOS emulator submodule (not authentication)."
+          if ! GIT_TERMINAL_PROMPT=0 git ls-remote "$CORE_URL" HEAD >/dev/null 2>&1; then
+            echo "::error title=Emulator core unavailable::Pinned submodule CrownParkComputing/dosbox-x-sdl3 is inaccessible to GitHub Actions. Cannot compile Android emulator. Obtain authorized source/fork at the exact pinned core revision, then update and verify bootstrap_core.sh; do not substitute stock DOSBox-X."
+            exit 2
+          fi
+          echo "Emulator core endpoint reachable; pinned commit check follows in bootstrap_core.sh."
       - name: A10 atomic-publish + parity/boot + native/Gradle build attempt
         shell: bash
         run: |

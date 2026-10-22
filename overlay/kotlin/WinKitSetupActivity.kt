@@ -28,7 +28,7 @@ import java.util.zip.ZipOutputStream
 /** A2 source overlay: standalone source import + offline-only launch selector.
  * No real Ethernet, Tailscale sockets, Windows files or remote-desktop code. */
 class WinKitSetupActivity : Activity() {
-    private companion object { const val PICK_IMAGE = 0x3120; const val PICK_CONFIG = 0x3121; const val EXPORT_NATIVE_CRASH = 0x3122; const val UI_RELEASE = "A26" }
+    private companion object { const val PICK_IMAGE = 0x3120; const val PICK_CONFIG = 0x3121; const val PICK_TRANSFER = 0x3123; const val EXPORT_NATIVE_CRASH = 0x3122; const val UI_RELEASE = "A26" }
     private val mainThread = Handler(Looper.getMainLooper())
     private val workers = Executors.newSingleThreadExecutor()
     private val store by lazy { GuestStore(filesDir) }
@@ -36,6 +36,7 @@ class WinKitSetupActivity : Activity() {
     private lateinit var imageSha: EditText
     private lateinit var sourcePath: EditText
     private lateinit var import: Button
+    private lateinit var transfer: Button
     private lateinit var config: Button
     private lateinit var boot: Button
     private lateinit var acknowledged: CheckBox
@@ -99,6 +100,12 @@ class WinKitSetupActivity : Activity() {
             }
             addAction(it)
         }
+        transfer = Button(this).also {
+            it.text = "Import WinKit Mac transfer ZIP (private)"
+            it.setOnClickListener { pick(PICK_TRANSFER) }
+            addAction(it)
+        }
+        label("The Mac ZIP includes the disk and manifest; its SHA-256 is verified automatically.", 14f)
         // Test the real Android emulator path without Mac exports or Microsoft media.
         Button(this).also { diagnostic ->
             diagnostic.text = "Install GPL BIOS smoke test (no DOS/Windows)"
@@ -263,16 +270,25 @@ class WinKitSetupActivity : Activity() {
             }
             return
         }
-        if (requestCode !in arrayOf(PICK_IMAGE, PICK_CONFIG)) return
+        if (requestCode !in arrayOf(PICK_IMAGE, PICK_CONFIG, PICK_TRANSFER)) return
         val sha = imageSha.text.toString().trim()
         val old = sourcePath.text.toString().trim()
         import.isEnabled = false
+        transfer.isEnabled = false
         config.isEnabled = false
         boot.isEnabled = false
-        update("Reading SAF source into private storage...")
+        update("Reading selected source into private storage; networking remains disabled...")
         workers.execute {
             val message = try {
-                if (requestCode == PICK_IMAGE) {
+                if (requestCode == PICK_TRANSFER) {
+                    val receipt = WinKitAndroidDiskImporter.importArchive(this, uri)
+                    val evidence = java.io.FileInputStream(receipt.image).use { disk ->
+                        BootSectorEvidence.inspect(disk, receipt.bytes)
+                    }
+                    "Mac ZIP verified and installed privately: ${receipt.bytes} bytes; " +
+                        "SHA-256 ${receipt.sha256}; partition: ${evidence.kind}. " +
+                        "No guest boot or LAN identity verified. Import offline DOSBox-X config next."
+                } else if (requestCode == PICK_IMAGE) {
                     contentResolver.openInputStream(uri)?.use { src ->
                         val receipt = store.importVerified(src, sha)
                         val evidence = java.io.FileInputStream(receipt.image).use { disk ->
@@ -361,6 +377,7 @@ class WinKitSetupActivity : Activity() {
     private fun refresh() {
         if (::boot.isInitialized) boot.isEnabled = isReady() && ::acknowledged.isInitialized && acknowledged.isChecked
         if (::import.isInitialized) import.isEnabled = !store.installedImage().exists()
+        if (::transfer.isInitialized) transfer.isEnabled = !store.installedImage().exists()
         if (::config.isInitialized) config.isEnabled = !offlineConf.exists() && store.installedImage().exists()
     }
     private fun update(message: String) { mainThread.post { if (::status.isInitialized) status.text = message } }
