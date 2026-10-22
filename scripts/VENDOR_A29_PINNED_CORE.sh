@@ -42,7 +42,7 @@ git -C "$ROOT" cat-file -e "$CORE_SHA:src/gui/retrodos_host.cpp" || {
 git -C "$ROOT" ls-tree -rl "$CORE_SHA" | python3 -c '
 import sys
 for line in sys.stdin:
-    metadata, sep, path = line.rstrip("\\n").partition("\\t")
+    metadata, sep, path = line.rstrip().partition(chr(9))
     fields = metadata.split()
     if len(fields) < 4 or fields[3] == "-":
         continue
