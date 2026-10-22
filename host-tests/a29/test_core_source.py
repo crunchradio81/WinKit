@@ -56,7 +56,7 @@ class TestPinnedCoreRecovery(unittest.TestCase):
         self.assertNotIn('--squash', importer)
         self.assertIn('"$VENDORED_TREE" = "$ORIGINAL_TREE"', importer)
         self.assertIn('git -C "$ROOT" cat-file -e "$CORE_SHA:include/retrodos_host.h"', importer)
-        self.assertIn('git -C "$ROOT" config submodule.core.url "$CORE_HISTORY"', bootstrap)
+        self.assertIn('git -C "$DEST" config submodule.core.url "$CORE_HISTORY"', bootstrap)
         self.assertIn('git -C "$DEST" -c protocol.file.allow=always submodule update', bootstrap)
         self.assertIn('"$VENDORED_TREE" = "$PINNED_TREE"', bootstrap)
 
