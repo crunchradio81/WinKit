@@ -1,0 +1,13 @@
+{
+  "android_native_build_verified": false,
+  "guest_boot_verified": false,
+  "included_bytes": 59438332,
+  "included_files": 1525,
+  "license_notice": "COPYING and original inline notices",
+  "original_git_tree": "68005f10ab25418b40621875ad8e7a4bd867335c",
+  "repository": "joncampbell123/dosbox-x",
+  "retrodos_host_bridge_present": false,
+  "revision": "029bd65c5dcc7cdc7f2e14e35278620d9707d969",
+  "selection": "src/include/tests text source and selected build metadata; exclude binary media and ROMs",
+  "status": "source-owned-not-built"
+}
