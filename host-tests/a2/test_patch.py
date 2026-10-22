@@ -97,7 +97,7 @@ class TestPatch(unittest.TestCase):
                    '    }\n')
         result = p.patch_gradle(fixture)
         self.assertIn('org.winkit.android.a29transfer', result)
-        self.assertNotIn('org.winkit.android.a2', result)
+        self.assertNotIn('applicationId = "org.winkit.android.a2"', result)
         self.assertIn('keepDebugSymbols += "**/*.so"', result)
         self.assertEqual(result.count('keepDebugSymbols += "**/*.so"'), 1)
         with self.assertRaises(ValueError): p.patch_gradle(result)
