@@ -28,7 +28,7 @@ import java.util.zip.ZipOutputStream
 /** A2 source overlay: standalone source import + offline-only launch selector.
  * No real Ethernet, Tailscale sockets, Windows files or remote-desktop code. */
 class WinKitSetupActivity : Activity() {
-    private companion object { const val PICK_IMAGE = 0x3120; const val PICK_CONFIG = 0x3121; const val EXPORT_NATIVE_CRASH = 0x3122; const val UI_RELEASE = "A26" }
+    private companion object { const val PICK_IMAGE = 0x3120; const val PICK_CONFIG = 0x3121; const val EXPORT_NATIVE_CRASH = 0x3122; const val PICK_MAC_TRANSFER = 0x3123; const val UI_RELEASE = "A26" }
     private val mainThread = Handler(Looper.getMainLooper())
     private val workers = Executors.newSingleThreadExecutor()
     private val store by lazy { GuestStore(filesDir) }
@@ -99,6 +99,16 @@ class WinKitSetupActivity : Activity() {
             }
             addAction(it)
         }
+        Button(this).also { transfer ->
+            transfer.text = "Import WinKit Mac transfer ZIP (RC24.6)"
+            transfer.setOnClickListener {
+                if (store.installedImage().exists() || ready.exists() || offlineConf.exists()) {
+                    update("Existing machine detected; transfer will never overwrite it.")
+                } else pick(PICK_MAC_TRANSFER)
+            }
+            addAction(transfer)
+        }
+        label("Mac transfer imports disk only. Then import the original DOSBox-X config below; no LAN until Windows identity is changed.", 14f)
         // Test the real Android emulator path without Mac exports or Microsoft media.
         Button(this).also { diagnostic ->
             diagnostic.text = "Install GPL BIOS smoke test (no DOS/Windows)"
@@ -260,6 +270,23 @@ class WinKitSetupActivity : Activity() {
                     "WinKit diagnostics saved: startup log=$savedLog, tombstone=$savedTombstone"
                 } catch (e: Exception) { "Diagnostic export failed (${e.javaClass.simpleName}): ${e.message}" }
                 update(message)
+            }
+            return
+        }
+        if (requestCode == PICK_MAC_TRANSFER) {
+            import.isEnabled = false
+            config.isEnabled = false
+            boot.isEnabled = false
+            update("Verifying Mac export ZIP in private Android storage...")
+            workers.execute {
+                val message = try {
+                    val receipt = MacTransferImporter.importZip(this, uri)
+                    "Verified Mac transfer: ${receipt.bytes} bytes; SHA-256 ${receipt.sha256}. " +
+                        "Disk only: import Mac DOSBox-X config next. Ethernet remains disabled."
+                } catch (e: Exception) {
+                    "Mac transfer rejected safely: ${e.message}"
+                }
+                mainThread.post { refresh(); update(message) }
             }
             return
         }
