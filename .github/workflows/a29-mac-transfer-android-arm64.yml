@@ -1,6 +1,12 @@
 name: WinKit A29 Android ARM64 Mac Transfer (isolated; device unverified)
 on:
   workflow_dispatch:
+    inputs:
+      core_repository:
+        description: 'Public GitHub owner/repo holding exactly the pinned SDL3 core commit'
+        type: string
+        required: false
+        default: CrownParkComputing/dosbox-x-sdl3
 permissions:
   contents: read
 jobs:
@@ -10,6 +16,7 @@ jobs:
     env:
       ANDROID_API: '28'
       ANDROID_ABI: arm64-v8a
+      WINKIT_CORE_REPO: ${{ inputs.core_repository }}
     steps:
       - name: Checkout dedicated A29 transfer branch
         uses: actions/checkout@v4
@@ -48,6 +55,7 @@ jobs:
           set -euo pipefail
           cd "$WINKIT_SOURCE_ROOT"
           python3 host-tests/a2/test_patch.py
+          python3 host-tests/a29/test_core_source.py
           grep -Fq "APP_ID = 'org.winkit.android.a29transfer'" scripts/apply_a2_overlay.py
           grep -Fq 'object MacTransferImporter' overlay/kotlin/MacTransferImporter.kt
           grep -Fq 'PICK_MAC_TRANSFER' overlay/kotlin/WinKitSetupActivity.kt
@@ -57,12 +65,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          CORE_URL=https://github.com/CrownParkComputing/dosbox-x-sdl3.git
-          if ! GIT_TERMINAL_PROMPT=0 git ls-remote "$CORE_URL" HEAD >/dev/null 2>&1; then
-            echo "::error title=Required emulator source inaccessible::The original pinned SDL3 core repository is not publicly readable. Restore the authorized exact source at commit 4167c3aca0953e8b2af8ee3b63c94e6bdb2cfe11; do not substitute stock DOSBox-X."
+          cd "$WINKIT_SOURCE_ROOT"
+          CORE_URL="$(python3 scripts/a29_core_source.py "$WINKIT_CORE_REPO")"
+          echo "Checking public SDL3 source endpoint (exact gitlink commit remains pinned)."
+          if ! GIT_TERMINAL_PROMPT=0 git ls-remote --exit-code "$CORE_URL" HEAD >/dev/null 2>&1; then
+            echo "::error title=Required emulator source inaccessible::GitHub core source is inaccessible. Supply a public owner/repo containing the exact pinned commit 4167c3aca0953e8b2af8ee3b63c94e6bdb2cfe11 in the workflow input. Do not substitute a different core revision."
             exit 2
           fi
-          echo "Core repository accessible; pinned commit verified later by bootstrap."
+          echo "Source endpoint reachable. Bootstrap must still verify exact commit."
       - name: Java 17
         uses: actions/setup-java@v4
         with:
