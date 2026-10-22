@@ -20,7 +20,7 @@ internal object MacTransferImporter {
         val freeBytes = StatFs(if (machines.isDirectory) machines.absolutePath else context.filesDir.absolutePath)
             .availableBytes
         val receipt = context.contentResolver.openInputStream(uri)?.use { stream ->
-            MacTransferDiskInstaller.install(context.filesDir, stream, freeBytes) { manifestText ->
+            MacTransferDiskInstaller.install(context.filesDir, stream, freeBytes, parseManifest = { manifestText ->
                 val meta = JSONObject(manifestText)
                 val target = meta.getJSONObject("target")
                 val disk = meta.getJSONObject("disk")
@@ -36,7 +36,7 @@ internal object MacTransferImporter {
                     diskBytes = disk.getLong("bytes"),
                     diskSha256 = disk.getString("sha256")
                 )
-            }
+            })
         } ?: error("Unable to read selected Mac transfer ZIP")
         return Receipt(receipt.bytes, receipt.sha256)
     }
