@@ -53,7 +53,9 @@ jobs:
           test ! -e vendor/dosbox-x/contrib
           git add -f -- vendor/dosbox-x
           git add MANIFEST.sha256
-          git diff --cached --check
+          # Historic upstream sources contain pre-existing whitespace. Only
+          # enforce whitespace on our own manifest, not 7,000 upstream files.
+          git diff --cached --check -- MANIFEST.sha256
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'A30: retain pinned editable DOSBox-X source-only snapshot'
