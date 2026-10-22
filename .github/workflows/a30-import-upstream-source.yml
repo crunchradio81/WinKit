@@ -1,0 +1,78 @@
+name: WinKit A30 Import Editable DOSBox-X Source
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/a30-import-upstream-source.yml'
+permissions:
+  contents: write
+
+jobs:
+  source-import:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout isolated A30 branch for source ownership
+        uses: actions/checkout@v4
+        with:
+          ref: android-a30-upstream-core-source
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Check safety policy and original source integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = android-a30-upstream-core-source
+          test ! -e vendor/dosbox-x
+          python3 host-tests/a30/test_source_import.py
+          mkdir -p "$RUNNER_TEMP/winkit-verified"
+          git archive --format=tar HEAD | tar -xf - -C "$RUNNER_TEMP/winkit-verified"
+          python3 "$RUNNER_TEMP/winkit-verified/VERIFY_A10.py"
+          bash -n scripts/RUN_A30_UPSTREAM_SOURCE_AUDIT.sh
+      - name: Fetch full pinned upstream source into temporary runner directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$RUNNER_TEMP/a30-dosbox-x-core"
+          git init -q "$CORE"
+          git -C "$CORE" remote add origin https://github.com/joncampbell123/dosbox-x.git
+          GIT_TERMINAL_PROMPT=0 git -C "$CORE" -c protocol.version=2 fetch --depth=1 --no-tags origin 029bd65c5dcc7cdc7f2e14e35278620d9707d969
+          git -C "$CORE" checkout --detach -q 029bd65c5dcc7cdc7f2e14e35278620d9707d969
+          python3 scripts/a30_audit_upstream_core.py --checkout "$CORE" --output "$RUNNER_TEMP/a30-source-audit.json"
+      - name: Import source-only snapshot and recheck checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/a30_vendor_upstream_source.py --upstream "$RUNNER_TEMP/a30-dosbox-x-core" --winkit "$GITHUB_WORKSPACE"
+          test -f vendor/dosbox-x/COPYING
+          test -f vendor/dosbox-x/src/dosbox.cpp
+          test -f vendor/dosbox-x/include/dosbox.h
+          test ! -e vendor/dosbox-x/ROMs
+          test ! -e vendor/dosbox-x/vs
+          test ! -e vendor/dosbox-x/contrib
+          git add -f -- vendor/dosbox-x
+          git add MANIFEST.sha256
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'A30: retain pinned editable DOSBox-X source-only snapshot'
+          mkdir -p "$RUNNER_TEMP/winkit-import-verified"
+          git archive --format=tar HEAD | tar -xf - -C "$RUNNER_TEMP/winkit-import-verified"
+          python3 "$RUNNER_TEMP/winkit-import-verified/VERIFY_A10.py"
+          echo "A30 editable upstream source is now a tracked commit; Android ABI/host bridge and guest boot not yet verified."
+      - name: Publish verified source ownership only to isolated A30 branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = android-a30-upstream-core-source
+          test -z "$(git status --porcelain)"
+          git push origin HEAD:refs/heads/android-a30-upstream-core-source
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinKit-A30-Source-Import-Audit-NOT-APK
+          path: ${{ runner.temp }}/a30-source-audit.json
+          if-no-files-found: ignore
+          retention-days: 30
