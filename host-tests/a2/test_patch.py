@@ -80,6 +80,8 @@ class TestPatch(unittest.TestCase):
     def test_manifest_security(self):
         s=p.patch_manifest(MANIFEST)
         self.assertIn('WinKitSetupActivity',s)
+        self.assertIn('android:label="WinKit A29 Transfer"', s)
+        self.assertEqual(s.count('android:label="WinKit A29 Transfer"'), 1)
         self.assertIn('allowBackup="false"',s)
         self.assertNotIn('android.permission.INTERNET',s)
         self.assertIn('android:screenOrientation="sensorLandscape"',s)
@@ -94,7 +96,8 @@ class TestPatch(unittest.TestCase):
                    '        }\n'
                    '    }\n')
         result = p.patch_gradle(fixture)
-        self.assertIn('org.winkit.android.a2', result)
+        self.assertIn('org.winkit.android.a29transfer', result)
+        self.assertNotIn('org.winkit.android.a2', result)
         self.assertIn('keepDebugSymbols += "**/*.so"', result)
         self.assertEqual(result.count('keepDebugSymbols += "**/*.so"'), 1)
         with self.assertRaises(ValueError): p.patch_gradle(result)
