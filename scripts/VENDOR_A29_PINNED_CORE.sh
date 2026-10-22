@@ -34,9 +34,21 @@ git -C "$ROOT" cat-file -e "$CORE_SHA:include/retrodos_host.h" || {
 git -C "$ROOT" cat-file -e "$CORE_SHA:src/gui/retrodos_host.cpp" || {
   echo 'Wrong core: missing Retro-DOS host bridge.' >&2; exit 2;
 }
-[[ -z "$(git -C "$ROOT" ls-tree -r "$CORE_SHA" | grep '^160000 commit ' || true)" ]] || {
-  echo 'Core has nested submodules requiring separate source review.' >&2; exit 2;
+[[ -z "$(git -C "$ROOT" ls-tree -r "$CORE_SHA" | grep -E '^(120000 blob|160000 commit) ' || true)" ]] || {
+  echo 'Core has symlinks or nested submodules requiring separate source review.' >&2; exit 2;
 }
+# GitHub refuses individual ordinary Git objects above 100 MiB. Catch
+# incompatible upstream snapshots before creating a subtree commit.
+git -C "$ROOT" ls-tree -rl "$CORE_SHA" | python3 -c '
+import sys
+for line in sys.stdin:
+    metadata, sep, path = line.rstrip("\\n").partition("\\t")
+    fields = metadata.split()
+    if len(fields) < 4 or fields[3] == "-":
+        continue
+    if int(fields[3]) > 100 * 1024 * 1024:
+        raise SystemExit("Source file exceeds GitHub maximum: " + path)
+'
 # The commit becomes part of WinKit ancestry; full-history GitHub checkouts
 # retain the exact core Git object and all editable source files.
 git -C "$ROOT" subtree add --prefix="$PREFIX" "$CORE_SHA" -m \
