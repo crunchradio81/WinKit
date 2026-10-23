@@ -6,6 +6,8 @@ on:
       - '.github/workflows/a31-android-native-probe.yml'
       - 'vendor/dosbox-x/**'
       - 'MANIFEST.sha256'
+      - 'android/a31-runtime/**'
+      - 'scripts/A31_BUILD_RUNTIME_SO.sh'
       - 'scripts/A31_COMPILE_MATRIX.sh'
       - 'scripts/A31_CPU_ARCHIVE_PROBE.sh'
       - 'scripts/A31_SUBSYSTEM_ARCHIVES.sh'
@@ -15,7 +17,7 @@ permissions:
 jobs:
   native-compile-probe:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       SDL2_COMMIT: 5d249570393f7a37e037abf22cd6012a4cc56a71
       LIBPNG_COMMIT: 4e3f57d50f552841550a36eabbb3fbcecacb7750
@@ -167,6 +169,8 @@ jobs:
           test -x "$SDL2_CONFIG"
           # The pinned upstream SDL3 switch treats --disable-sdl3 as enabled.
           # Leave SDL3 unspecified and use the Android toolchain, not host GCC.
+          export CFLAGS="-fPIC"
+          export CXXFLAGS="-fPIC"
           export CC="$NDK/aarch64-linux-android28-clang"
           export CXX="$NDK/aarch64-linux-android28-clang++"
           export AR="$NDK/llvm-ar"
@@ -234,6 +238,60 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/A31_FULL_LINK_PROBE.sh
+      - name: Link SDL2-loadable Android DOSBox-X libmain.so
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/A31_BUILD_RUNTIME_SO.sh
+      - name: Install Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Stage pinned SDL2 Activity sources and native libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+          ROOT=android/a31-runtime/app/src/main
+          mkdir -p "$ROOT/java/org/libsdl/app" "$ROOT/jniLibs/arm64-v8a"
+          cp "$A31_ROOT/SDL/android-project/app/src/main/java/org/libsdl/app/"*.java "$ROOT/java/org/libsdl/app/"
+          test "$(find "$ROOT/java/org/libsdl/app" -maxdepth 1 -name '*.java' | wc -l)" -eq 9
+          cp "$A31_ROOT/a31-runtime-libs/libSDL2.so" "$ROOT/jniLibs/arm64-v8a/"
+          cp "$A31_ROOT/a31-runtime-libs/libmain.so" "$ROOT/jniLibs/arm64-v8a/"
+      - name: Assemble isolated offline A31 Android runtime smoke APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd android/a31-runtime
+          gradle --no-daemon --stacktrace :app:assembleDebug > "$A31_ROOT/android-smoke-gradle.log" 2>&1 || {
+            tail -n 95 "$A31_ROOT/android-smoke-gradle.log"
+            exit 1
+          }
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          python3 - "$APK" <<'PY'
+          import sys,zipfile
+          with zipfile.ZipFile(sys.argv[1]) as z:
+              names=set(z.namelist())
+          assert "lib/arm64-v8a/libmain.so" in names
+          assert "lib/arm64-v8a/libSDL2.so" in names
+          assert all(not p.lower().endswith((".raw",".img",".vhd",".iso")) for p in names)
+          print("A31 APK PACKAGE PASS: SDL2 + DOSBox-X ARM64 libraries; runtime and boot unverified")
+          PY
+          cp "$APK" "$A31_ROOT/WinKit-A31-SDL2-ARM64-SMOKE-NOT-BOOT-VERIFIED.apk"
+      - name: Upload isolated A31 smoke APK (not boot verified)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinKit-A31-SDL2-ARM64-SMOKE-NOT-BOOT-VERIFIED
+          path: ${{ runner.temp }}/a31/WinKit-A31-SDL2-ARM64-SMOKE-NOT-BOOT-VERIFIED.apk
+          if-no-files-found: error
+          retention-days: 14
       - name: Copy diagnostics and remove binaries
         if: always()
         shell: bash
