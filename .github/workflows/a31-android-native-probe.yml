@@ -144,6 +144,8 @@ jobs:
           export PKG_CONFIG_LIBDIR="$A31_ROOT/sdl2-prefix/lib/pkgconfig:$A31_ROOT/libpng-prefix/lib/pkgconfig"
           export CPPFLAGS="-I$A31_ROOT/sdl2-prefix/include/SDL2 -I$A31_ROOT/libpng-prefix/include"
           export LDFLAGS="-L$A31_ROOT/sdl2-prefix/lib -L$A31_ROOT/libpng-prefix/lib"
+          # Statically built libpng references frexp/modf/pow, provided by Android libm.
+          export LIBS="-lm"
           ./configure --host=aarch64-linux-android --build=x86_64-pc-linux-gnu \
             --enable-sdl2 --disable-x11 --disable-opengl \
             --disable-gamelink --disable-sdlnet \
