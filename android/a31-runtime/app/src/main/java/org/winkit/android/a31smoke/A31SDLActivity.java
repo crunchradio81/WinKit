@@ -1,74 +1,115 @@
 package org.winkit.android.a31smoke;
 
-import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 import org.libsdl.app.SDLActivity;
 
-/** Lifecycle trace only; DO NOT equate onResume with successful DOS boot. */
+/**
+ * Trace SDL2 Java activity and whether SDLThread actually starts.
+ * Java UI readiness is not evidence of a DOSBox-X frame or a guest boot.
+ */
 public final class A31SDLActivity extends SDLActivity {
     private TextView overlay;
+    private final Handler observer = new Handler(Looper.getMainLooper());
+    private final java.util.ArrayList<Runnable> pending = new java.util.ArrayList<>();
+    private boolean stopping = false;
 
-    @Override
-    protected String[] getLibraries() {
-        return new String[]{"SDL2", "main"};
+    @Override protected String[] getLibraries() { return new String[]{"SDL2", "main"}; }
+    @Override protected String[] getArguments() { return new String[0]; }
+
+    private String nativeThreadState(boolean withStack) {
+        Thread thread = mSDLThread;
+        String result = "SDLThread=" + (thread == null ? "NOT CREATED" :
+              thread.getState().toString() + ", alive=" + thread.isAlive()) +
+            "; SDL state=" + mCurrentNativeState + "->" + mNextNativeState +
+            "; focus=" + mHasFocus + "; resume=" + mIsResumedCalled;
+        if (withStack && thread != null) {
+            StackTraceElement[] stack = thread.getStackTrace();
+            StringBuilder sb = new StringBuilder(result);
+            for (int i = 0; i < Math.min(5, stack.length); i++) {
+                sb.append(" [").append(i).append("] ").append(stack[i].toString());
+            }
+            return sb.toString();
+        }
+        return result;
     }
 
-    @Override
-    protected String[] getArguments() {
-        return new String[0];
+    private void checkpoint(String label, boolean stack) {
+        if (stopping) return;
+        String details = nativeThreadState(stack);
+        A31DiagnosticLog.record(this, label + ": " + details);
+        if (overlay != null) {
+            Thread t = mSDLThread;
+            overlay.setText("A31 SDL diagnostics (no guest disk)\n" +
+                "SDLThread: " + (t == null ? "NOT CREATED" :
+                     (t.isAlive() ? "ALIVE" : "STOPPED") + " / " + t.getState()) +
+                "\nNative state: " + mCurrentNativeState + " / " + mNextNativeState +
+                "\nBack -> Copy startup report");
+        }
     }
 
-    @Override
-    protected void onCreate(Bundle state) {
-        A31DiagnosticLog.record(this, "SDL Activity onCreate BEFORE native SDL initialization");
+    private void observeAfter(long millis) {
+        final Runnable sample = () -> {
+            if (!stopping) checkpoint("SDLThread after " + millis + " ms", true);
+        };
+        pending.add(sample);
+        observer.postDelayed(sample, millis);
+    }
+
+    @Override protected void onCreate(Bundle state) {
+        A31DiagnosticLog.record(this, "SDL Activity onCreate BEFORE SDL Java/native setup");
         super.onCreate(state);
-        A31DiagnosticLog.record(this, "SDL Activity onCreate AFTER native SDL initialization");
-        // Small Java overlay: if it appears above black SDL output, the Java
-        // activity is alive, but it does NOT prove the emulator drew a frame.
+        A31DiagnosticLog.record(this, "SDL Activity onCreate AFTER SDL Java/native setup");
         overlay = new TextView(this);
-        overlay.setText("A31: SDL Activity created\nDOS/WFW boot unverified");
         overlay.setTextColor(Color.WHITE);
-        overlay.setBackgroundColor(Color.argb(175, 0, 0, 0));
-        overlay.setTextSize(12);
-        int p = (int)(8 * getResources().getDisplayMetrics().density);
-        overlay.setPadding(p,p,p,p);
+        overlay.setBackgroundColor(Color.argb(205, 10, 10, 10));
+        overlay.setTextSize(13);
+        int pad = (int)(10 * getResources().getDisplayMetrics().density);
+        overlay.setPadding(pad, pad, pad, pad);
         overlay.setClickable(false);
         overlay.setFocusable(false);
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
             FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.TOP | Gravity.START);
+        params.topMargin = (int)(42 * getResources().getDisplayMetrics().density);
         getWindow().addContentView(overlay, params);
-        A31DiagnosticLog.record(this, "SDL Activity Java overlay added");
+        checkpoint("SDL Activity created", false);
+        observeAfter(1000);
+        observeAfter(3500);
+        observeAfter(8500);
     }
 
-    @Override
-    protected void onResume() {
+    @Override protected void onResume() {
         super.onResume();
         A31DiagnosticLog.record(this, "SDL Activity onResume");
-        if (overlay != null) overlay.setText("A31: SDL Java resumed\nNo guest disk configured");
+        checkpoint("SDL Activity resumed", false);
     }
 
-    @Override
-    protected void onPause() {
-        A31DiagnosticLog.record(this, "SDL Activity onPause");
-        super.onPause();
-    }
-
-    @Override
-    protected void onDestroy() {
-        A31DiagnosticLog.record(this, "SDL Activity onDestroy BEFORE native shutdown");
-        super.onDestroy();
-    }
-
-    @Override
-    public void onWindowFocusChanged(boolean focused) {
+    @Override public void onWindowFocusChanged(boolean focused) {
         super.onWindowFocusChanged(focused);
-        A31DiagnosticLog.record(this, focused ?
-            "SDL Activity window FOCUSED" : "SDL Activity window UNFOCUSED");
+        A31DiagnosticLog.record(this, focused ? "SDL Activity window FOCUSED" :
+            "SDL Activity window UNFOCUSED");
+        checkpoint("SDL Activity focusChanged", false);
+    }
+
+    @Override protected void onPause() {
+        checkpoint("SDL Activity before onPause", true);
+        super.onPause();
+        A31DiagnosticLog.record(this, "SDL Activity onPause");
+    }
+
+    @Override protected void onDestroy() {
+        checkpoint("SDL Activity before onDestroy", true);
+        stopping = true;
+        for (Runnable callback : pending) observer.removeCallbacks(callback);
+        pending.clear();
+        super.onDestroy();
+        A31DiagnosticLog.record(this, "SDL Activity onDestroy AFTER SDL cleanup");
     }
 }

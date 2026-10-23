@@ -80,3 +80,11 @@ To avoid rebuilding the full 19-archive native core for Java startup diagnostics
 A31 now opens a **Java-first launcher** with a native library load check, explicit launch button, and persisted lifecycle checkpoints around SDLActivity.onCreate/onResume/onPause/onDestroy/focus. A small noninteractive overlay distinguishes an active Android Java surface from a completely blank startup. Copy and Share report require no network permission or privileged logcat access. The report contains only local runtime metadata and recent lifecycle checkpoints, not guest images. Native SIGSEGV, crashes before Java callbacks, or SDL main-thread hangs may still require device ADB logcat.
 
 No guest image imported; black-screen root cause NOT YET ESTABLISHED. The diagnostic APK uses the same A31 smoke package ID, but CI debug signing can differ across runs; uninstall ONLY the A31 smoke package if Android rejects an update.
+
+## Device test: 2026-10-23 Samsung SM-A366U Android API 36
+
+The user confirmed A31 `libc++_shared.so`, `libSDL2.so` and `libmain.so` all pass Java `System.loadLibrary`. SDL Activity `onCreate` and `onResume` completed, and the diagnostic Java overlay was visible above a black SDL rendering area. Focus/pause/destroy transitions were observed on exit. No guest disk was mounted. The pre-existing copy of `/storage/emulated/0/YARDOMOB.raw` was not accessed. These observations **do not** prove native `SDL_main` entry or a rendered frame.
+
+A31 versionCode 33 samples the pinned SDL2 `mSDLThread` (protected) at 1, 3.5, 8.5 seconds and during pause/destroy, recording thread existence, state, liveness, SDL lifecycle flags and up to five Java stack frames. The Java overlay displays the status below the Android notification icons. This lets a new device report distinguish “SDLThread never created,” “thread alive in nativeRunMain,” and “thread stopped.” If SDLThread is alive in nativeRunMain with no video, further **native** DOSBox-X startup/frame checkpoints are required; this Java probe cannot pinpoint a C++ initialization hang. Full DOSBox-X rebuild remains unnecessary for these Java-only checks.
+
+The prior black-screen test **was not a crash report**. No assertion about DOSBox-X engine rendering is warranted yet.

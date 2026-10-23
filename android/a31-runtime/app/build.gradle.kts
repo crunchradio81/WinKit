@@ -8,8 +8,8 @@ android {
         applicationId = "org.winkit.android.a31smoke"
         minSdk = 28
         targetSdk = 35
-        versionCode = 32
-        versionName = "0.31.2-startup-diagnostics"
+        versionCode = 33
+        versionName = "0.31.3-sdlthread-diagnostics"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes { getByName("release") { isMinifyEnabled = false } }

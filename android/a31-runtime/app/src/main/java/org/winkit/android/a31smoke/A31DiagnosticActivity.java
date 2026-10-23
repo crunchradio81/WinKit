@@ -47,7 +47,7 @@ public final class A31DiagnosticActivity extends Activity {
         column.addView(instructions);
         button(column, "1 — Check native libraries", this::checkLibraries);
         button(column, "2 — Launch DOSBox-X SDL2", () -> {
-            A31DiagnosticLog.record(this, "Launching SDL Activity");
+            A31DiagnosticLog.record(this, "Launching SDL Activity — waiting for SDLThread samples at 1s, 3.5s, 8.5s");
             refreshReport();
             startActivity(new Intent(this, A31SDLActivity.class));
         });

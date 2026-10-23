@@ -124,7 +124,7 @@ jobs:
           print("PASS 3 native libs bundled; no guest images")
           PY
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "package: name='org.winkit.android.a31smoke'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "versionCode='32'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "versionCode='33'"
           mkdir -p "$RUNNER_TEMP/a31-output"
           cp "$APK" "$RUNNER_TEMP/a31-output/WinKit-A31-STARTUP-DIAGNOSTICS-ARM64.apk"
       - name: Publish only Java-first startup diagnostic APK
