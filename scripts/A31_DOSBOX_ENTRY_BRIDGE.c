@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 static atomic_int g_stage = ATOMIC_VAR_INIT(0);
 static atomic_int g_result = ATOMIC_VAR_INIT(0);
@@ -75,10 +76,42 @@ int SDL_main(int argc, char **argv) {
         fprintf(stderr,"[A31 ENTRY] %s\n",g_error);
         return 102;
     }
+    /*
+     * Android launches from an app with no interactive terminal. This exact
+     * pinned DOSBox-X revision defaults to a desktop working-folder prompt
+     * when stdin is not a TTY. The prompt loops forever under SDLActivity.
+     * Give DOSBox-X a real app-private CWD AND its supported -nopromptfolder
+     * argument. Never use/mount the user's YARDOMOB.raw here.
+     */
+    const char *private_dir = SDL_AndroidGetInternalStoragePath();
+    if (!private_dir || !*private_dir || chdir(private_dir) != 0) {
+        snprintf(g_error,sizeof(g_error),"App-private working dir unavailable (errno=%d)",errno);
+        atomic_store(&g_stage,-3);
+        fprintf(stderr,"[A31 ENTRY] %s\n",g_error);
+        __android_log_print(ANDROID_LOG_ERROR,"WinKitA31Entry","%s",g_error);
+        return 103;
+    }
+    if (argc < 0 || argc > 63) {
+        snprintf(g_error,sizeof(g_error),"Unexpected SDL argc=%d",argc);
+        atomic_store(&g_stage,-4);
+        fprintf(stderr,"[A31 ENTRY] %s\n",g_error);
+        return 104;
+    }
+    char *startup_argv[66];
+    int startup_argc = 0;
+    startup_argv[startup_argc++] = (argc > 0 && argv && argv[0]) ?
+        argv[0] : (char *)"dosbox-x";
+    for (int i=1; i<argc; ++i)
+        startup_argv[startup_argc++] = argv[i];
+    startup_argv[startup_argc++] = (char *)"-nopromptfolder";
+    startup_argv[startup_argc] = NULL;
+    fprintf(stderr,"[A31 ENTRY] private working directory: %s\n",private_dir);
+    fprintf(stderr,"[A31 ENTRY] -nopromptfolder enabled, no interactive stdin required\n");
     fprintf(stderr,"[A31 ENTRY] calling real DOSBox-X SDL_main\n");
-    __android_log_print(ANDROID_LOG_INFO,"WinKitA31Entry","Calling real DOSBox-X SDL_main");
+    __android_log_print(ANDROID_LOG_INFO,"WinKitA31Entry",
+        "Calling DOSBox-X SDL_main with private cwd and -nopromptfolder");
     atomic_store(&g_stage, 3); /* handed execution into DOSBox-X */
-    int code = dosbox_main(argc, argv);
+    int code = dosbox_main(startup_argc, startup_argv);
     atomic_store(&g_result, code);
     atomic_store(&g_stage, 4); /* DOSBox-X returned */
     fprintf(stderr,"[A31 ENTRY] DOSBox-X SDL_main returned code=%d\n",code);
