@@ -32,3 +32,7 @@ The first subsystem matrix compiled 10/14 Android AArch64 source objects. Four B
 ## Full upstream CPU archive gate
 
 Following the object matrix, `scripts/A31_CPU_ARCHIVE_PROBE.sh` invokes the generated upstream Autotools `src/cpu/Makefile` to build `libcpu.a` using the Android cross-compiler. The gate verifies that the archive has at least ten object members and that an extracted member is AArch64 ELF. Logs list all archive members and failures. It is an architecture/build acceptance gate only; it neither links an Android executable nor runs a DOS guest.
+
+## Boot-critical subsystem archive targets
+
+The next A31 validation now invokes upstream `make` targets for `ints/libints.a`, `dos/libdos.a`, `fpu/libfpu.a` and `hardware/libhardware.a` via `scripts/A31_SUBSYSTEM_ARCHIVES.sh`. These archives are *individual source compilation tests*: even all passing does not produce a usable emulator until the linker resolves their dependencies and Android SDL activity, audio and filesystem lifecycles work. Each target writes an independent log to identify missing source, dependencies, and Android-specific portability errors.
