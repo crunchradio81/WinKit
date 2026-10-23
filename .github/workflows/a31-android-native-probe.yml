@@ -113,6 +113,23 @@ jobs:
           set -euo pipefail
           cp -a vendor/dosbox-x "$A31_ROOT/dosbox-source"
           cd "$A31_ROOT/dosbox-source"
+          # Workaround applies ONLY to the disposable Android build copy.
+          # Pinned upstream routes *-linux-android* through generic Linux,
+          # incorrectly injecting -lrt (unavailable in Android/Bionic).
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("configure.ac")
+          contents=p.read_text()
+          original='    *-*-linux*)\n       AC_DEFINE(LINUX, 1, [Compiling on GNU/Linux])'
+          replacement=('    *-*-linux-android*)\n'
+                       '       AC_DEFINE(LINUX, 1, [Compiling for Android/Linux])\n'
+                       '       CXXFLAGS="$CXXFLAGS -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"\n'
+                       '       ;;\n'
+                       + original)
+          assert contents.count(original)==1, "Pinned upstream host-case changed; stop instead of guessing"
+          p.write_text(contents.replace(original,replacement,1))
+          print("A31: patched Android Bionic target separately from GNU/Linux in temporary source")
+          PY
           autoreconf -fi 2>&1 | tee "$A31_ROOT/autoreconf.log"
           NDK="$ANDROID_HOME/ndk/$ANDROID_NDK_REV/toolchains/llvm/prebuilt/linux-x86_64/bin"
           SDL2_CONFIG="$A31_ROOT/sdl2-prefix/bin/sdl2-config"
@@ -133,6 +150,11 @@ jobs:
             2>&1 | tee "$A31_ROOT/configure.log"
           test -s config.h
           grep -F "$NDK/aarch64-linux-android28-clang" config.log >/dev/null
+          if grep -E -- '(^|[[:space:]])-lrt([[:space:]]|$)' "$A31_ROOT/configure.log" >/dev/null; then
+            echo "::error::Bionic cross-configure unexpectedly used separate librt" >&2
+            exit 1
+          fi
+          grep -E '^#define (C_LIBPNG|C_LIBZ) 1' config.h | tee "$A31_ROOT/png-zlib-flags.txt"
           cp config.h "$A31_ROOT/generated-config.h"
           echo 'PASS Android cross-configured config.h; emulator still unlinked'
       - name: Compile genuine DOSBox-X ARM64 object
