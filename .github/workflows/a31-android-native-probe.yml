@@ -7,6 +7,7 @@ on:
       - 'vendor/dosbox-x/**'
       - 'MANIFEST.sha256'
       - 'scripts/A31_COMPILE_MATRIX.sh'
+      - 'scripts/A31_CPU_ARCHIVE_PROBE.sh'
   workflow_dispatch:
 permissions:
   contents: read
@@ -185,6 +186,11 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/A31_COMPILE_MATRIX.sh
+      - name: Build upstream DOSBox-X complete CPU ARM64 archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/A31_CPU_ARCHIVE_PROBE.sh
       - name: Copy diagnostics and remove binaries
         if: always()
         shell: bash
