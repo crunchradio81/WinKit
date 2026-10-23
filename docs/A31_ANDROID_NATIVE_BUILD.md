@@ -54,3 +54,11 @@ The A31 completion matrix confirmed 17/18 extra archives; `src/misc/savestates.c
 ## Full native link probe on Android
 
 The verified A31 archive matrix has now compiled 19 of 19 additional upstream static archives, including xBRZ. The first executable link then identified only an absent `main`: Android's SDL2 headers name the native entry `SDL_main` for an SDLActivity host. The diagnostic link script now compiles a **temporary** two-line native forwarding adapter (`main` → `SDL_main`) and links it with upstream's generated Android linker command. This does **not** implement an Android SDL Activity, package an APK or prove boot. Later runtime integration must use the proper Android SDL lifecycle rather than relying on this shell executable adapter.
+
+## A31 isolated SDL2 Activity packaging probe
+
+`android/a31-runtime` is an independent Android Gradle 8.9 application with package ID `org.winkit.android.a31smoke`; it cannot replace the existing WinKit Android package. The Android app has no Internet permission and contains no guest operating-system media. In CI, the pinned upstream SDL2 Android Java source is copied from commit `5d249570393f7a37e037abf22cd6012a4cc56a71` at build time. The Java runtime is matched to the exactly pinned native libSDL2.so built earlier.
+
+For shared-library packaging, the DOSBox-X archives are cross-built with `-fPIC`, then linked as `libmain.so` using an undefined-root request for `SDL_main` (rather than using the diagnostic executable's `main` forwarding adapter). The pipeline verifies AArch64 ELF, exported SDL_main, and a needed libSDL2.so dependency. Gradle packages both libraries into a distinct ARM64 debug smoke APK and checks the APK's ZIP members and absence of guest disk files.
+
+Passing this build proves only package assembly and native symbol availability. It does **not** prove that an Android activity can initialize and sustain DOSBox-X, that keyboard/audio/video work, that guest disks are imported, or that DOS 6.22 and WFW 3.11 boot. A debug smoke APK must not be installed as an upgrade to an existing A26/A29 working package. Physical device tests and native crash capture remain required.
