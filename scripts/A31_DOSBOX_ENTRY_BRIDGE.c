@@ -18,6 +18,9 @@ static atomic_int g_stage = ATOMIC_VAR_INIT(0);
 static atomic_int g_result = ATOMIC_VAR_INIT(0);
 static char g_error[384];
 
+/* JNI sector probe is isolated and read-only. */
+#include "A31_NATIVE_DISK_PROBE.c"
+
 JNIEXPORT jint JNICALL
 Java_org_winkit_android_a31smoke_A31SDLActivity_entryStage(JNIEnv *env, jclass clazz) {
     (void)env; (void)clazz;
