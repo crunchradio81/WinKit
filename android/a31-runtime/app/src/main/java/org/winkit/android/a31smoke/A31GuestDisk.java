@@ -130,7 +130,11 @@ public final class A31GuestDisk {
             if (pfd == null) throw new IOException("Provider did not return a descriptor.");
             long bytes = pfd.getStatSize();
             if (bytes < 0) {
-                try (FileInputStream input = new FileInputStream(pfd.getFileDescriptor())) {
+                // FileInputStream.close also closes its FD; use an independent dup.
+                try (ParcelFileDescriptor duplicate =
+                        ParcelFileDescriptor.dup(pfd.getFileDescriptor());
+                     FileInputStream input =
+                        new FileInputStream(duplicate.getFileDescriptor())) {
                     bytes = input.getChannel().size();
                 }
             }
