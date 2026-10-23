@@ -36,3 +36,7 @@ Following the object matrix, `scripts/A31_CPU_ARCHIVE_PROBE.sh` invokes the gene
 ## Boot-critical subsystem archive targets
 
 The next A31 validation now invokes upstream `make` targets for `ints/libints.a`, `dos/libdos.a`, `fpu/libfpu.a` and `hardware/libhardware.a` via `scripts/A31_SUBSYSTEM_ARCHIVES.sh`. These archives are *individual source compilation tests*: even all passing does not produce a usable emulator until the linker resolves their dependencies and Android SDL activity, audio and filesystem lifecycles work. Each target writes an independent log to identify missing source, dependencies, and Android-specific portability errors.
+
+## A31 native archive dependency recovery
+
+First non-CPU archive run: `libints.a` (29 members) and `libfpu.a` (3 members) compile successfully for Android ARM64. DOS compilation encountered a missing `vs/sdl/src/cdrom/SDL_cdrom.c`; hardware compilation encountered `snd_pc98/sound/getsnd/getsndmn.mcr`. Restored both from exact pinned upstream along with required `SDL_syscdrom.h`, with Git blob verification. The CD-ROM source may still rely on unimplemented platform callbacks at **link/runtime** time. A successful archive compilation does not certify CD/DVD support. No vendor binary media or guest OS images are included.
