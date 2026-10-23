@@ -62,3 +62,11 @@ The verified A31 archive matrix has now compiled 19 of 19 additional upstream st
 For shared-library packaging, the DOSBox-X archives are cross-built with `-fPIC`, then linked as `libmain.so` using an undefined-root request for `SDL_main` (rather than using the diagnostic executable's `main` forwarding adapter). The pipeline verifies AArch64 ELF, exported SDL_main, and a needed libSDL2.so dependency. Gradle packages both libraries into a distinct ARM64 debug smoke APK and checks the APK's ZIP members and absence of guest disk files.
 
 Passing this build proves only package assembly and native symbol availability. It does **not** prove that an Android activity can initialize and sustain DOSBox-X, that keyboard/audio/video work, that guest disks are imported, or that DOS 6.22 and WFW 3.11 boot. A debug smoke APK must not be installed as an upgrade to an existing A26/A29 working package. Physical device tests and native crash capture remain required.
+
+## A31 packaged C++ runtime dependency closure
+
+The initial APK build from Actions run 39974565265 omitted `libc++_shared.so`, despite `libmain.so` declaring it in `DT_NEEDED`. Android does not provide NDK's shared C++ runtime as a system library.
+
+The A31 CI now copies `libc++_shared.so` for ARM64 from the **same pinned NDK revision** as the emulator build. `scripts/A31_VERIFY_APK_RUNTIME.py` inspects all packaged AArch64 native ELF libraries and their `DT_NEEDED` dependencies. Every dependency must be either packaged in the APK or provided by Android's API-28 system NDK stubs. The checker explicitly forbids treating `libc++_shared.so` as an Android system library, checks for other ABIs and guest-disk media, and verifies the independent smoke application ID.
+
+Success only verifies packaging, ELF dependencies and the Android APK build. It does **not** establish device startup, SDL initialization, keyboard operation, sound, DOS or Windows for Workgroups boot.
