@@ -1,84 +1,145 @@
-name: A31 Android ARM64 Upstream Compiler Probe
+name: A31 Android ARM64 Upstream SDL2 Build Probe
 on:
   push:
     branches: [android-a31-native-boot]
     paths:
       - '.github/workflows/a31-android-native-probe.yml'
-      - 'android/a31/**'
       - 'vendor/dosbox-x/**'
+      - 'MANIFEST.sha256'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   native-compile-probe:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 90
+    env:
+      SDL2_COMMIT: 5d249570393f7a37e037abf22cd6012a4cc56a71
+      ANDROID_NDK_REV: 28.2.13676358
     steps:
       - uses: actions/checkout@v4
         with:
           ref: android-a31-native-boot
-      - name: Verify isolated branch and upstream provenance
+      - name: Verify source branch, manifest and pinned metadata
         shell: bash
         run: |
           set -euo pipefail
           test "$(git branch --show-current)" = android-a31-native-boot
+          python3 VERIFY_A10.py
           python3 - <<'PY'
-          import json
           from pathlib import Path
-          p=Path("vendor/dosbox-x/WINKIT_SOURCE_IMPORT.json")
-          d=json.loads(p.read_text())
+          import json,subprocess
+          d=json.loads(Path("vendor/dosbox-x/WINKIT_SOURCE_IMPORT.json").read_text())
           assert d["revision"]=="029bd65c5dcc7cdc7f2e14e35278620d9707d969"
-          assert d["android_native_build_verified"] is False
-          assert d["guest_boot_verified"] is False
-          assert Path("vendor/dosbox-x/src/misc/cross.cpp").is_file()
-          print("A31: upstream source present; boot and full core remain unverified")
+          assert not d["android_native_build_verified"] and not d["guest_boot_verified"]
+          blobs={
+            "contrib/macos/dosbox-x.plist.in":"298c210cff07ea44f386bc5b589446e059a165df",
+            "contrib/linux/dosbox-x.spec.in":"c768cdcb02091288bdbde6fe47469ea0802a0647",
+            "contrib/linux/com.dosbox_x.DOSBox-X.metainfo.xml.in":"045c79cc663ec3e922c5d2a80ee214acdac4066c",
+            "make-rpm.sh.in":"1b98e7f9fef3913743766cce4fefcc9fb76b460e",
+          }
+          for name,want in blobs.items():
+            actual=subprocess.check_output(["git","hash-object",str(Path("vendor/dosbox-x")/name)],text=True).strip()
+            assert actual==want,(name,actual,want)
+          print("PASS: exact pinned public upstream Autotools templates")
           PY
-      - name: Install Android NDK
-        uses: android-actions/setup-android@v4
-      - name: Install pinned NDK
-        run: sdkmanager --install 'ndk;28.2.13676358'
-      - name: Install upstream configuration generators
-        run: sudo apt-get update && sudo apt-get install -y autoconf automake libtool pkg-config
-      - name: Generate Android config.h using upstream Autotools
+      - name: Install host tools
         shell: bash
         run: |
           set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake libtool pkg-config cmake ninja-build
           mkdir -p "$RUNNER_TEMP/a31"
-          cd vendor/dosbox-x
-          autoreconf -fi 2>&1 | tee "$RUNNER_TEMP/a31/autoreconf.log"
-          NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo "A31_ROOT=$RUNNER_TEMP/a31" >> "$GITHUB_ENV"
+      - uses: android-actions/setup-android@v4
+      - name: Install pinned Android ARM64 NDK
+        run: sdkmanager --install "ndk;$ANDROID_NDK_REV"
+      - name: Checkout exact public SDL2 revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$A31_ROOT/SDL"
+          git -C "$A31_ROOT/SDL" init -q
+          git -C "$A31_ROOT/SDL" remote add origin https://github.com/libsdl-org/SDL.git
+          GIT_TERMINAL_PROMPT=0 git -C "$A31_ROOT/SDL" fetch --depth=1 --no-tags origin "$SDL2_COMMIT" 2>&1 | tee "$A31_ROOT/sdl2-fetch.log"
+          git -C "$A31_ROOT/SDL" checkout -q --detach "$SDL2_COMMIT"
+          test "$(git -C "$A31_ROOT/SDL" rev-parse HEAD)" = "$SDL2_COMMIT"
+      - name: Build native Android SDL2 ARM64 shared library
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/$ANDROID_NDK_REV"
+          cmake -S "$A31_ROOT/SDL" -B "$A31_ROOT/sdl2-build" -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$A31_ROOT/sdl2-prefix" \
+            -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF \
+            2>&1 | tee "$A31_ROOT/sdl2-cmake.log"
+          cmake --build "$A31_ROOT/sdl2-build" -j 3 2>&1 | tee "$A31_ROOT/sdl2-compile.log"
+          cmake --install "$A31_ROOT/sdl2-build" 2>&1 | tee "$A31_ROOT/sdl2-install.log"
+          test -s "$A31_ROOT/sdl2-prefix/lib/libSDL2.so"
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h "$A31_ROOT/sdl2-prefix/lib/libSDL2.so" | tee "$A31_ROOT/sdl2-elf.txt"
+          grep -F 'AArch64' "$A31_ROOT/sdl2-elf.txt"
+      - name: Cross-configure DOSBox-X using genuine Android SDL2
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a vendor/dosbox-x "$A31_ROOT/dosbox-source"
+          cd "$A31_ROOT/dosbox-source"
+          autoreconf -fi 2>&1 | tee "$A31_ROOT/autoreconf.log"
+          NDK="$ANDROID_HOME/ndk/$ANDROID_NDK_REV/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          SDL2_CONFIG="$A31_ROOT/sdl2-prefix/bin/sdl2-config"
+          test -x "$SDL2_CONFIG"
           CC="$NDK/aarch64-linux-android28-clang" \
           CXX="$NDK/aarch64-linux-android28-clang++" \
           AR="$NDK/llvm-ar" RANLIB="$NDK/llvm-ranlib" \
+          SDL2_CONFIG="$SDL2_CONFIG" \
+          PKG_CONFIG_LIBDIR="$A31_ROOT/sdl2-prefix/lib/pkgconfig" \
+          CPPFLAGS="-I$A31_ROOT/sdl2-prefix/include/SDL2" \
+          LDFLAGS="-L$A31_ROOT/sdl2-prefix/lib" \
           ./configure --host=aarch64-linux-android --build=x86_64-pc-linux-gnu \
-            --disable-sdl3 2>&1 | tee "$RUNNER_TEMP/a31/configure.log"
+            --enable-sdl2 --disable-sdl3 --disable-x11 --disable-opengl \
+            --disable-gamelink --disable-sdlnet \
+            2>&1 | tee "$A31_ROOT/configure.log"
           test -s config.h
-          cp config.h "$RUNNER_TEMP/a31/generated-config.h"
-      - name: Attempt ARM64 upstream C++ translation unit
+          cp config.h "$A31_ROOT/generated-config.h"
+          echo 'PASS Android cross-configured config.h; emulator still unlinked'
+      - name: Compile genuine DOSBox-X ARM64 object
         shell: bash
         run: |
           set -euo pipefail
-          NDK="$ANDROID_HOME/ndk/28.2.13676358"
-          CXX="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang++"
-          test -x "$CXX"
-          mkdir -p "$RUNNER_TEMP/a31"
-          "$CXX" --version | tee "$RUNNER_TEMP/a31/compiler-version.txt"
-          "$CXX" -std=c++17 -fsyntax-only \
-            -Ivendor/dosbox-x/include \
-            vendor/dosbox-x/src/misc/cross.cpp \
-            2>&1 | tee "$RUNNER_TEMP/a31/upstream-unit.log"
-          echo 'PASS: one genuine upstream translation unit parsed by Android ARM64 compiler.'
-          echo 'NOT PROVEN: full DOSBox-X link, Android bridge, APK, or guest boot.'
-      - name: Save configure failure log
-        if: failure()
+          NDK="$ANDROID_HOME/ndk/$ANDROID_NDK_REV/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          "$NDK/aarch64-linux-android28-clang++" --version > "$A31_ROOT/compiler-version.txt"
+          "$NDK/aarch64-linux-android28-clang++" -std=c++17 -fPIC -c \
+            -I"$A31_ROOT/dosbox-source" \
+            -I"$A31_ROOT/dosbox-source/include" \
+            -I"$A31_ROOT/sdl2-prefix/include/SDL2" \
+            "$A31_ROOT/dosbox-source/src/misc/cross.cpp" \
+            -o "$A31_ROOT/dosbox-cross.o" \
+            2>&1 | tee "$A31_ROOT/upstream-unit.log"
+          test -s "$A31_ROOT/dosbox-cross.o"
+          "$NDK/llvm-readelf" -h "$A31_ROOT/dosbox-cross.o" | tee "$A31_ROOT/dosbox-object-elf.txt"
+          grep -F 'AArch64' "$A31_ROOT/dosbox-object-elf.txt"
+          echo 'PASS ARM64 upstream C++ object compiled; emulator link, APK and boot UNVERIFIED'
+      - name: Copy diagnostics and remove binaries
+        if: always()
         shell: bash
         run: |
-          if test -f vendor/dosbox-x/config.log; then cp vendor/dosbox-x/config.log "$RUNNER_TEMP/a31/upstream-config.log"; fi
-      - name: Upload compiler diagnostics
+          mkdir -p "$RUNNER_TEMP/a31"
+          if test -f "$RUNNER_TEMP/a31/dosbox-source/config.log"; then
+            cp "$RUNNER_TEMP/a31/dosbox-source/config.log" "$RUNNER_TEMP/a31/dosbox-config.log"
+          fi
+          echo 'A31 compiler/configuration probe only. No emulated guest boot or APK.' > "$RUNNER_TEMP/a31/STATUS.txt"
+          rm -f "$RUNNER_TEMP/a31/dosbox-cross.o"
+      - name: Upload text diagnostics only (no APK or guest media)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: A31-ARM64-upstream-compiler-diagnostics
-          path: ${{ runner.temp }}/a31/
+          name: A31-ARM64-SDL2-build-diagnostics-NOT-APK
+          path: |
+            ${{ runner.temp }}/a31/*.txt
+            ${{ runner.temp }}/a31/*.log
+            ${{ runner.temp }}/a31/generated-config.h
           if-no-files-found: warn
           retention-days: 30
