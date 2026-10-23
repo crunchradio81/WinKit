@@ -28,3 +28,7 @@ All compile checks must produce true AArch64 ELF objects and report per-file err
 ## CD-ROM source-import correction
 
 The first subsystem matrix compiled 10/14 Android AArch64 source objects. Four BIOS/DOS/disk files failed because the original A30 import omitted `vs/sdl/src/cdrom/compat_SDL_cdrom.h`, which the pinned DOSBox-X SDL2 CD-ROM API requires. A31 restores the **exact pinned upstream LGPL 2.1+ declarations** and verifies its Git blob ID. This header alone does not implement CD-ROM runtime functions: the SDL2 CD-ROM backend and real ISO/media functionality still require a tested host implementation or stubs with explicit feature limitations. No guest data or ROMs are imported.
+
+## Full upstream CPU archive gate
+
+Following the object matrix, `scripts/A31_CPU_ARCHIVE_PROBE.sh` invokes the generated upstream Autotools `src/cpu/Makefile` to build `libcpu.a` using the Android cross-compiler. The gate verifies that the archive has at least ten object members and that an extracted member is AArch64 ELF. Logs list all archive members and failures. It is an architecture/build acceptance gate only; it neither links an Android executable nor runs a DOS guest.
