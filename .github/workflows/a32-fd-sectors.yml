@@ -22,6 +22,17 @@ jobs:
           cc -std=c11 -O2 -Wall -Wextra -Werror -D_FILE_OFFSET_BITS=64 \
             -Iandroid/a32-fd android/a32-fd/test_fd_sectors.c -o /tmp/a32-fd-tests
           /tmp/a32-fd-tests
+      - name: Run A32 DOSBox-X adapter behavioral tests on sparse 2 GB fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ -std=c++17 -O2 -Wall -Wextra -Werror -D_FILE_OFFSET_BITS=64 \
+            -D_XOPEN_SOURCE=700 -Iandroid/a32-fd \
+            -Iandroid/a32-fd/tests/mock \
+            android/a32-fd/winkit_a32_image_disk.cpp \
+            android/a32-fd/tests/test_adapter.cpp \
+            -o /tmp/a32-adapter-tests
+          /tmp/a32-adapter-tests
       - uses: android-actions/setup-android@v4
       - name: Cross-compile FD backend for Android ARM64
         shell: bash
