@@ -14,7 +14,7 @@ mkdir -p "$A31_ROOT/a31-runtime-libs"
 # -u SDL_main pulls SDL2's entry point out of libgui.a.
 rm "$SRC/src/dosbox-x"
 if make -C "$SRC/src" -j 3 dosbox-x \
-    dosbox_x_LINK="$CXX -shared -Wl,-soname,libmain.so -Wl,--no-undefined -Wl,-u,SDL_main -o dosbox-x" \
+    dosbox_x_LINK="$CXX -shared -Wl,-soname,libmain.so -Wl,--no-undefined -Wl,-u,SDL_main -L$A31_ROOT/sdl2-prefix/lib -L$A31_ROOT/libpng-prefix/lib -o dosbox-x" \
     LDFLAGS="-L$A31_ROOT/sdl2-prefix/lib -L$A31_ROOT/libpng-prefix/lib" \
     > "$A31_ROOT/android-libmain-link.log" 2>&1; then
   mv "$SRC/src/dosbox-x" "$LIB"
