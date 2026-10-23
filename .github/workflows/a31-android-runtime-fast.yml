@@ -1,5 +1,5 @@
 name: A31 Fast Android Startup Diagnostics
-# v34: separate native SDL2 color renderer, diagnostic escape control
+# v35: color probe verified on device; diagnose original DOSBox-X SDL_main entry
 on:
   push:
     branches: [android-a31-native-boot]
