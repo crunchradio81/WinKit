@@ -47,6 +47,8 @@ jobs:
             "android/a32-fd/winkit_a32_image_disk.h",
             "android/a32-fd/winkit_fd_sectors.h",
             "scripts/A32_BUILD_RUNTIME_SO.sh",
+            "scripts/A32_PATCH_NATIVE_SOURCE.py",
+            "android/a32-fd/A32SDLActivity.java",
           }
           manifest=root/"MANIFEST.sha256"
           original=manifest.read_text()
@@ -224,6 +226,12 @@ jobs:
           grep -E '^#define (C_LIBPNG|C_LIBZ) 1' config.h | tee "$A31_ROOT/png-zlib-flags.txt"
           cp config.h "$A31_ROOT/generated-config.h"
           echo 'PASS Android cross-configured config.h; emulator still unlinked'
+      - name: Hook disposable DOSBox-X BIOS setup to A32 staged descriptor
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/A32_PATCH_NATIVE_SOURCE.py
+          grep -Fq 'winkit_a32_attach_pending_disk();' "$A31_ROOT/dosbox-source/src/ints/bios_disk.cpp"
       - name: Compile genuine DOSBox-X ARM64 object
         shell: bash
         run: |
@@ -305,6 +313,100 @@ jobs:
         with:
           name: WinKit-A32-ARM64-LIBMAIN-ADAPTER-NOT-BOOTABLE
           path: ${{ runner.temp }}/a31/a32-publish/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Assemble A32 isolated read-only Android SAF/BIOS diagnostic APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+          ROOT=android/a31-runtime/app/src/main
+          LIBDIR="$ROOT/jniLibs/arm64-v8a"
+          JAVADIR="$ROOT/java"
+          mkdir -p "$LIBDIR" "$JAVADIR/org/libsdl/app"
+          cp "$A31_ROOT/SDL/android-project/app/src/main/java/org/libsdl/app/"*.java "$JAVADIR/org/libsdl/app/"
+          cp "$A31_ROOT/a31-runtime-libs/libmain.so" "$LIBDIR/libmain.so"
+          cp "$A31_ROOT/a31-runtime-libs/libSDL2.so" "$LIBDIR/libSDL2.so"
+          NDKROOT="$ANDROID_HOME/ndk/$ANDROID_NDK_REV"
+          NDK="$NDKROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          cp "$NDKROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" "$LIBDIR/libc++_shared.so"
+          # Rebuild A31 diagnostic bridge and color probe against the pinned SDL2 headers.
+          "$NDK/aarch64-linux-android28-clang" -std=c11 -O2 -fPIC -shared \
+            -Wl,-soname,libbridge.so -Wl,--no-undefined \
+            -I"$A31_ROOT/SDL/include" -L"$LIBDIR" \
+            scripts/A31_DOSBOX_ENTRY_BRIDGE.c -lSDL2 -ldl -llog \
+            -o "$LIBDIR/libbridge.so"
+          "$NDK/aarch64-linux-android28-clang" -std=c11 -O2 -fPIC -shared \
+            -Wl,-soname,libprobe.so -Wl,--no-undefined \
+            -I"$A31_ROOT/SDL/include" -L"$LIBDIR" \
+            scripts/A31_SDL_RENDER_PROBE.c -lSDL2 -llog \
+            -o "$LIBDIR/libprobe.so"
+          # Overlay new frontend into temporary build only; A31 baseline stays identical.
+          cp android/a32-fd/A32SDLActivity.java "$JAVADIR/org/winkit/android/a31smoke/"
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path("android/a31-runtime/app/src/main")
+          manifest=root/"AndroidManifest.xml"
+          content=manifest.read_text()
+          anchor='<activity android:name=".A31SDLActivity"'
+          assert content.count(anchor)==1
+          content=content.replace(anchor,'<activity android:name=".A32SDLActivity" android:exported="false"\n        android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|layoutDirection|fontScale|density|keyboard|navigation"/>\n    '+anchor,1)
+          manifest.write_text(content)
+          path=root/"java/org/winkit/android/a31smoke/A31DiagnosticActivity.java"
+          content=path.read_text()
+          anchor='        button(column, "4 — SELECT EXISTING YARDOMOB.raw (READ ONLY)", this::chooseRawImage);'
+          assert content.count(anchor)==1
+          content=content.replace(anchor,'''        button(column, "A32 — Attach selected RAW to DOSBox-X (READ ONLY)", () -> {
+              A31DiagnosticLog.record(this, "A32: launching SAF descriptor/BIOS attachment diagnostic");
+              startActivity(new Intent(this, A32SDLActivity.class));
+          });
+          '''+anchor,1)
+          path.write_text(content)
+          path=root/"java/org/winkit/android/a31smoke/A31DiagnosticLog.java"
+          content=path.read_text().replace("WinKit A31 SDL2 Android startup diagnostic",
+              "WinKit A32 FD BIOS/IDE Android startup diagnostic")
+          content=content.replace("Guest boot: NOT VERIFIED; image selection is inspection-only",
+              "Guest boot: NOT VERIFIED; A32 descriptor attachment is experimental and read only")
+          path.write_text(content)
+          gradle=Path("android/a31-runtime/app/build.gradle.kts")
+          content=gradle.read_text()
+          assert content.count('applicationId = "org.winkit.android.a31smoke"')==1
+          gradle.write_text(content.replace(
+              'applicationId = "org.winkit.android.a31smoke"',
+              'applicationId = "org.winkit.android.a32smoke"').replace(
+              'versionCode = 39','versionCode = 40').replace(
+              'versionName = "0.31.9-native-readonly-disk-probe"',
+              'versionName = "0.32.0-saf-bios-attach-smoke"'))
+          print("PASS: A32 isolated package and explicit read-only launch button staged")
+          PY
+          cd android/a31-runtime
+          gradle --no-daemon :app:assembleDebug > "$A31_ROOT/a32-apk-gradle.log" 2>&1 || {
+            tail -n 90 "$A31_ROOT/a32-apk-gradle.log"
+            exit 1
+          }
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          python3 - "$APK" <<'PY'
+          import sys,zipfile
+          with zipfile.ZipFile(sys.argv[1]) as apk:
+              names=set(apk.namelist())
+              for name in ["libmain.so","libSDL2.so","libc++_shared.so",
+                           "libbridge.so","libprobe.so"]:
+                  assert "lib/arm64-v8a/"+name in names,name
+              assert not any(n.lower().endswith((".raw",".img",".iso",".vhd"))
+                             for n in names)
+          print("PASS: A32 native components included; no proprietary guest media")
+          PY
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" \
+            | grep -F "package: name='org.winkit.android.a32smoke'"
+          mkdir -p "$A31_ROOT/a32-apk"
+          cp "$APK" "$A31_ROOT/a32-apk/WinKit-A32-FD-BIOS-ATTACH-NOT-BOOT-VERIFIED.apk"
+          echo 'A32 boot remains NOT VERIFIED. Never write to original YARDOMOB.raw.' \
+            > "$A31_ROOT/a32-apk/STATUS.txt"
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: WinKit-A32-SAF-FD-BIOS-ATTACH-NOT-BOOT-VERIFIED
+          path: ${{ runner.temp }}/a31/a32-apk/
           retention-days: 14
           if-no-files-found: error
       - name: Publish native link diagnostic logs
