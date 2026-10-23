@@ -47,6 +47,8 @@ jobs:
             "vs/sdl/src/cdrom/SDL_cdrom.c":"2d09803ebac9beb8c8a930a131ec7412b23d547e",
             "vs/sdl/src/cdrom/SDL_syscdrom.h":"1989f8182bd18a067bee498ef5d2f82b98ed0ab3",
             "src/hardware/snd_pc98/sound/getsnd/getsndmn.mcr":"b0a76a3e2e1bedfe267281e77e940f3950ea0a86",
+            "vs/sdl/src/cdrom/dummy/SDL_syscdrom.c":"9821e979581559e81ba95f09abbf0c629f649c82",
+            "src/hardware/snd_pc98/sound/getsnd/getsndst.mcr":"90445ed371d816be14355173c505d9baf05f749f",
           }
           for name,want in blobs.items():
             actual=subprocess.check_output(["git","hash-object",str(Path("vendor/dosbox-x")/name)],text=True).strip()
@@ -141,6 +143,15 @@ jobs:
                        + original)
           assert contents.count(original)==1, "Pinned upstream host-case changed; stop instead of guessing"
           p.write_text(contents.replace(original,replacement,1))
+          # Android cannot pass through physical Linux CD-ROM drives; select
+          # upstream's dummy physical CD backend, not its Linux ioctl backend.
+          # CD image / ISO guest emulation remains a separate DOSBox-X feature.
+          cdrom=Path("src/dos/cdrom.cpp")
+          original_cdrom="#elif defined(LINUX)\n#define SDL_CDROM_LINUX"
+          assert cdrom.read_text().count(original_cdrom)==1
+          cdrom.write_text(cdrom.read_text().replace(
+              original_cdrom,
+              "#elif defined(LINUX) && !defined(__ANDROID__)\n#define SDL_CDROM_LINUX", 1))
           print("A31: patched Android Bionic target separately from GNU/Linux in temporary source")
           PY
           autoreconf -fi 2>&1 | tee "$A31_ROOT/autoreconf.log"
