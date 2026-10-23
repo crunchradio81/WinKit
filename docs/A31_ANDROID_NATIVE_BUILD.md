@@ -24,3 +24,7 @@ This is not a complete emulation core link, Android Activity integration, DOS/Wi
 The dedicated `scripts/A31_COMPILE_MATRIX.sh` stage tests fourteen separate upstream translation units under Android NDK Clang: CPU instructions/flags/paging, machine memory, VGA and VGA-related display state, Sound Blaster, audio mixer, keyboard, BIOS, INT10, disk BIOS, FAT disk drives, DOS kernel, and FPU.
 
 All compile checks must produce true AArch64 ELF objects and report per-file errors; the stage fails if any fail. Logs are text-only and record exact failures. A passing matrix remains a **partial core compilation**, not evidence that the full emulator links, SDL2 activity integration works, or guests boot. The next milestone is building complete component archives and a linked JNI library with runtime device verification.
+
+## CD-ROM source-import correction
+
+The first subsystem matrix compiled 10/14 Android AArch64 source objects. Four BIOS/DOS/disk files failed because the original A30 import omitted `vs/sdl/src/cdrom/compat_SDL_cdrom.h`, which the pinned DOSBox-X SDL2 CD-ROM API requires. A31 restores the **exact pinned upstream LGPL 2.1+ declarations** and verifies its Git blob ID. This header alone does not implement CD-ROM runtime functions: the SDL2 CD-ROM backend and real ISO/media functionality still require a tested host implementation or stubs with explicit feature limitations. No guest data or ROMs are imported.
