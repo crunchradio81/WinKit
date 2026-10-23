@@ -50,3 +50,7 @@ The upstream SDL2 CD-ROM integration selects `linux/SDL_syscdrom.c` when `LINUX`
 The A31 completion matrix confirmed 17/18 extra archives; `src/misc/savestates.cpp` referenced missing in-tree upstream MiniZip source. Seven exact text-source blobs from pinned DOSBox-X commit `029bd65c5dcc7cdc7f2e14e35278620d9707d969` were restored under `vendor/dosbox-x/vs/zlib/contrib/minizip/`. CI verifies original Git blob identities. These are original upstream sources, not arbitrary new MiniZip versions.
 
 `scripts/A31_FULL_LINK_PROBE.sh` now attempts `make -C src dosbox-x` with Android cross-compiled Makefiles *after* archive checks. It records native compiler/linker failures or checks ELF architecture when successful. A linked Android AArch64 executable still does **not** establish an APK, SDL Activity integration, keyboard lifecycle, sound, synthetic DOS boot, or WFW boot.
+
+## Full native link probe on Android
+
+The verified A31 archive matrix has now compiled 19 of 19 additional upstream static archives, including xBRZ. The first executable link then identified only an absent `main`: Android's SDL2 headers name the native entry `SDL_main` for an SDLActivity host. The diagnostic link script now compiles a **temporary** two-line native forwarding adapter (`main` → `SDL_main`) and links it with upstream's generated Android linker command. This does **not** implement an Android SDL Activity, package an APK or prove boot. Later runtime integration must use the proper Android SDL lifecycle rather than relying on this shell executable adapter.
