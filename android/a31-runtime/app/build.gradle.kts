@@ -8,8 +8,8 @@ android {
         applicationId = "org.winkit.android.a31smoke"
         minSdk = 28
         targetSdk = 35
-        versionCode = 38
-        versionName = "0.31.8-readonly-disk-inspection"
+        versionCode = 39
+        versionName = "0.31.9-native-readonly-disk-probe"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes { getByName("release") { isMinifyEnabled = false } }
