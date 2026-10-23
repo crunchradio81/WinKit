@@ -1,0 +1,41 @@
+name: A32 Read-only FD Sector Backend
+on:
+  push:
+    branches: [android-a32-fd-disk]
+    paths:
+      - 'android/a32-fd/**'
+      - '.github/workflows/a32-fd-sectors.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fd-sector-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: android-a32-fd-disk
+      - name: Build and test descriptor-backed sector reads
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -Wall -Wextra -Werror -D_FILE_OFFSET_BITS=64 \
+            -Iandroid/a32-fd android/a32-fd/test_fd_sectors.c -o /tmp/a32-fd-tests
+          /tmp/a32-fd-tests
+      - uses: android-actions/setup-android@v4
+      - name: Cross-compile FD backend for Android ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'ndk;28.2.13676358'
+          CC="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang"
+          cat >/tmp/a32-compile.c <<'EOF'
+          #define _XOPEN_SOURCE 700
+          #include "winkit_fd_sectors.h"
+          int a32_compilation_probe(winkit_fd_disk *d, void *p) {
+              return winkit_fd_disk_read(d, 0, 1, p);
+          }
+          EOF
+          "$CC" -std=c11 -O2 -Wall -Wextra -Werror -D_FILE_OFFSET_BITS=64 \
+            -Iandroid/a32-fd -c /tmp/a32-compile.c -o /tmp/a32-arm64.o
+          echo "PASS Android ARM64 backend compile; device and DOSBox boot unverified"
