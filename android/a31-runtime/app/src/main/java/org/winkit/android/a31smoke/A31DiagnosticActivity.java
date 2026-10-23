@@ -40,13 +40,17 @@ public final class A31DiagnosticActivity extends Activity {
         heading.setText("WinKit A31 — Startup diagnostics");
         column.addView(heading);
         TextView instructions = new TextView(this);
-        instructions.setText("Step 1: Check the libraries. Step 2: launch DOSBox-X. " +
-            "If the screen is black, return here and share the report. " +
-            "No DOS/Windows guest disk is included. This test won't boot WFW 3.11.");
+        instructions.setText("First test NATIVE SDL2 COLORS: purple background, cyan and yellow bars. " +
+            "Use the visible RETURN button to come back and copy the report. " +
+            "DOSBox-X is a separate test, without guest disk.");
         instructions.setTextSize(15);
         column.addView(instructions);
         button(column, "1 — Check native libraries", this::checkLibraries);
-        button(column, "2 — Launch DOSBox-X SDL2", () -> {
+        button(column, "2 — TEST NATIVE SDL2 COLORS (no DOSBox-X)", () -> {
+            A31DiagnosticLog.record(this, "Launching independent native SDL2 color renderer");
+            startActivity(new Intent(this, A31RenderProbeActivity.class));
+        });
+        button(column, "3 — Launch DOSBox-X SDL2 (existing black screen)", () -> {
             A31DiagnosticLog.record(this, "Launching SDL Activity — waiting for SDLThread samples at 1s, 3.5s, 8.5s");
             refreshReport();
             startActivity(new Intent(this, A31SDLActivity.class));
