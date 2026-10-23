@@ -88,3 +88,13 @@ The user confirmed A31 `libc++_shared.so`, `libSDL2.so` and `libmain.so` all pas
 A31 versionCode 33 samples the pinned SDL2 `mSDLThread` (protected) at 1, 3.5, 8.5 seconds and during pause/destroy, recording thread existence, state, liveness, SDL lifecycle flags and up to five Java stack frames. The Java overlay displays the status below the Android notification icons. This lets a new device report distinguish “SDLThread never created,” “thread alive in nativeRunMain,” and “thread stopped.” If SDLThread is alive in nativeRunMain with no video, further **native** DOSBox-X startup/frame checkpoints are required; this Java probe cannot pinpoint a C++ initialization hang. Full DOSBox-X rebuild remains unnecessary for these Java-only checks.
 
 The prior black-screen test **was not a crash report**. No assertion about DOSBox-X engine rendering is warranted yet.
+
+## Physical-device render and escape milestone (A31 v34)
+
+Samsung SM-A366U Android API 36 displays a Java overlay and reports SDLThread ALIVE/RUNNABLE, RESUMED/RESUMED, but the native DOSBox-X view stays black; the system Back navigation is consumed. This confirms Android/SDL thread existence, not a DOSBox-X video frame.
+
+A31 v34 introduces an on-screen **RETURN TO DIAGNOSTICS** Java Button (with Android 13+ back callback and legacy Back override), deliberately bringing the diagnostic launcher to the foreground without blocking on SDLActivity.onDestroy(), which synchronously joins the native SDLThread. The paused SDL Activity may remain alive; this is a diagnostic escape, not a complete guest shutdown feature.
+
+The launcher has a separate **TEST NATIVE SDL2 COLORS** action. This uses `A31RenderProbeActivity` and its own native `libprobe.so`, compiled from `scripts/A31_SDL_RENDER_PROBE.c` with the exact pinned upstream SDL2 headers and Android NDK. Its SDL_main calls SDL_Init, SDL_CreateWindow, SDL_CreateRenderer, SDL_RenderPresent, drawing a purple background and cyan/yellow bars. JNI reports startup stage and frame count to the Java overlay and app-private diagnostic log. A visible colored surface would establish SDL2 rendering independently of DOSBox-X; an increasing frame count with a black display indicates SDL window/surface presentation needs work. This is **not** a DOS boot test.
+
+Keep `/storage/emulated/0/YARDOMOB.raw` untouched and unmounted until native video startup is established. No Windows or DOS media is included. Only the fast CI job builds the new tiny probe; no DOSBox-X core rebuild required.
