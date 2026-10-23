@@ -8,8 +8,8 @@ android {
         applicationId = "org.winkit.android.a31smoke"
         minSdk = 28
         targetSdk = 35
-        versionCode = 35
-        versionName = "0.31.5-dosbox-native-entry"
+        versionCode = 36
+        versionName = "0.31.6-android-working-directory"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes { getByName("release") { isMinifyEnabled = false } }
