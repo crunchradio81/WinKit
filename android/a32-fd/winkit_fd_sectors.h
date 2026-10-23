@@ -1,7 +1,7 @@
 /* WinKit A32: read-only, owned descriptor-backed RAW sectors.
  * No /proc/self/fd reopen; no fdopen; no file path required.
  * The caller passes an existing SAF read-only fd and retains ownership of it.
- * This backend is intentionally NOT yet wired to DOSBox-X's imageDisk.
+ * The imageDisk subclass is separate; native core linking is still pending.
  */
 #ifndef WINKIT_A32_FD_SECTORS_H
 #define WINKIT_A32_FD_SECTORS_H
@@ -19,7 +19,7 @@ typedef struct {
     uint64_t sectors;
 } winkit_fd_disk;
 
-static int winkit_fd_disk_open(winkit_fd_disk *disk, int borrowed_fd, uint64_t bytes) {
+static inline int winkit_fd_disk_open(winkit_fd_disk *disk, int borrowed_fd, uint64_t bytes) {
     if (!disk) return EINVAL;
     disk->fd = -1;
     disk->sectors = 0;
@@ -37,14 +37,15 @@ static int winkit_fd_disk_open(winkit_fd_disk *disk, int borrowed_fd, uint64_t b
     disk->sectors = bytes / 512;
     return 0;
 }
-static int winkit_fd_disk_read(winkit_fd_disk *disk, uint64_t lba,
+static inline int winkit_fd_disk_read(winkit_fd_disk *disk, uint64_t lba,
                                uint32_t count, void *output) {
     if (!disk || disk->fd < 0 || !output || count == 0) return EINVAL;
     if (lba >= disk->sectors || (uint64_t)count > disk->sectors - lba)
         return ERANGE;
     uint64_t offset = lba * UINT64_C(512);
-    size_t total = (size_t)count * 512;
-    if ((uint64_t)total != (uint64_t)count * 512) return EOVERFLOW;
+    const uint64_t count_bytes = (uint64_t)count * UINT64_C(512);
+    if (count_bytes > (uint64_t)SIZE_MAX) return EOVERFLOW;
+    size_t total = (size_t)count_bytes;
     unsigned char *p = (unsigned char *)output;
     size_t done = 0;
     while (done < total) {
@@ -56,7 +57,7 @@ static int winkit_fd_disk_read(winkit_fd_disk *disk, uint64_t lba,
     }
     return 0;
 }
-static void winkit_fd_disk_close(winkit_fd_disk *disk) {
+static inline void winkit_fd_disk_close(winkit_fd_disk *disk) {
     if (!disk) return;
     if (disk->fd >= 0) close(disk->fd);
     disk->fd = -1;
