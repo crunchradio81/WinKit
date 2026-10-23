@@ -1,0 +1,62 @@
+name: A31 Android ARM64 Upstream Compiler Probe
+on:
+  push:
+    branches: [android-a31-native-boot]
+    paths:
+      - '.github/workflows/a31-android-native-probe.yml'
+      - 'android/a31/**'
+      - 'vendor/dosbox-x/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-compile-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: android-a31-native-boot
+      - name: Verify isolated branch and upstream provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = android-a31-native-boot
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("vendor/dosbox-x/WINKIT_SOURCE_IMPORT.json")
+          d=json.loads(p.read_text())
+          assert d["revision"]=="029bd65c5dcc7cdc7f2e14e35278620d9707d969"
+          assert d["android_native_build_verified"] is False
+          assert d["guest_boot_verified"] is False
+          assert Path("vendor/dosbox-x/src/misc/cross.cpp").is_file()
+          print("A31: upstream source present; boot and full core remain unverified")
+          PY
+      - name: Install Android NDK
+        uses: android-actions/setup-android@v4
+      - name: Install pinned NDK
+        run: sdkmanager --install 'ndk;28.2.13676358'
+      - name: Attempt ARM64 upstream C++ translation unit
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/28.2.13676358"
+          CXX="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang++"
+          test -x "$CXX"
+          mkdir -p "$RUNNER_TEMP/a31"
+          "$CXX" --version | tee "$RUNNER_TEMP/a31/compiler-version.txt"
+          "$CXX" -std=c++17 -fsyntax-only \
+            -Ivendor/dosbox-x/include \
+            vendor/dosbox-x/src/misc/cross.cpp \
+            2>&1 | tee "$RUNNER_TEMP/a31/upstream-unit.log"
+          echo 'PASS: one genuine upstream translation unit parsed by Android ARM64 compiler.'
+          echo 'NOT PROVEN: full DOSBox-X link, Android bridge, APK, or guest boot.'
+      - name: Upload compiler diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: A31-ARM64-upstream-compiler-diagnostics
+          path: ${{ runner.temp }}/a31/
+          if-no-files-found: warn
+          retention-days: 30
