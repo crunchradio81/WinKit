@@ -7,6 +7,7 @@ on:
       - '.github/workflows/a31-android-runtime-fast.yml'
       - 'android/a31-runtime/**'
       - 'scripts/A31_SDL_RENDER_PROBE.c'
+      - 'scripts/A31_DOSBOX_ENTRY_BRIDGE.c'
   workflow_dispatch:
 permissions:
   contents: read
@@ -38,6 +39,7 @@ jobs:
               "android/a31-runtime/app/src/main/java/org/winkit/android/a31smoke/A31SDLActivity.java",
               "android/a31-runtime/app/src/main/java/org/winkit/android/a31smoke/A31RenderProbeActivity.java",
               "scripts/A31_SDL_RENDER_PROBE.c",
+              "scripts/A31_DOSBOX_ENTRY_BRIDGE.c",
           ]
           for path in paths:
               actual=hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
@@ -103,6 +105,23 @@ jobs:
           "$NDK/bin/llvm-nm" -D "$LIBDIR/libprobe.so" | grep -E '[[:space:]]T[[:space:]]SDL_main$'
           "$NDK/bin/llvm-nm" -D "$LIBDIR/libprobe.so" | grep -F Java_org_winkit_android_a31smoke_A31RenderProbeActivity_probeStage
           echo 'PASS independent native SDL2 color probe linked; device video unverified'
+      - name: Build minimal A31 DOSBox-X SDL_main diagnostic bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64"
+          LIBDIR=android/a31-runtime/app/src/main/jniLibs/arm64-v8a
+          # Original libmain.so stays byte-for-byte identical to native build 39980004155.
+          "$NDK/bin/aarch64-linux-android28-clang" -std=c11 -O2 -fPIC -shared \
+            -Wl,-soname,libbridge.so -Wl,--no-undefined \
+            -I"$RUNNER_TEMP/sdl2-pinned/include" \
+            -L"$LIBDIR" scripts/A31_DOSBOX_ENTRY_BRIDGE.c -lSDL2 -ldl -llog \
+            -o "$LIBDIR/libbridge.so"
+          "$NDK/bin/llvm-readelf" -h "$LIBDIR/libbridge.so" | grep -F AArch64
+          "$NDK/bin/llvm-readelf" -d "$LIBDIR/libbridge.so" | grep -F libSDL2.so
+          "$NDK/bin/llvm-nm" -D "$LIBDIR/libbridge.so" | grep -E '[[:space:]]T[[:space:]]SDL_main$'
+          "$NDK/bin/llvm-nm" -D "$LIBDIR/libbridge.so" | grep -F Java_org_winkit_android_a31smoke_A31SDLActivity_entryStage
+          echo 'PASS: original DOSBox-X core unchanged, native entry bridge compiled'
       - name: Fetch matching pinned upstream SDL2 Java activity
         shell: bash
         run: |
@@ -145,13 +164,13 @@ jobs:
           import sys,zipfile
           with zipfile.ZipFile(sys.argv[1]) as archive:
               files=set(archive.namelist())
-          for name in ("libmain.so","libSDL2.so","libc++_shared.so","libprobe.so"):
+          for name in ("libmain.so","libSDL2.so","libc++_shared.so","libprobe.so","libbridge.so"):
               assert "lib/arm64-v8a/"+name in files,name
           assert not any(x.lower().endswith((".raw",".img",".iso",".vhd")) for x in files)
-          print("PASS 3 native libs bundled; no guest images")
+          print("PASS original emulator, SDL2, C++, color probe, and native entry bridge bundled")
           PY
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "package: name='org.winkit.android.a31smoke'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "versionCode='34'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "versionCode='35'"
           mkdir -p "$RUNNER_TEMP/a31-output"
           cp "$APK" "$RUNNER_TEMP/a31-output/WinKit-A31-STARTUP-DIAGNOSTICS-ARM64.apk"
       - name: Publish only Java-first startup diagnostic APK
