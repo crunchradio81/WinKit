@@ -29,6 +29,40 @@ jobs:
           test "$(git branch --show-current)" = android-a32-fd-disk
           mkdir -p "$RUNNER_TEMP/a31/source-audit"
           git archive --format=tar HEAD | tar -xf - -C "$RUNNER_TEMP/a31/source-audit"
+          # A31's immutable manifest is verified unchanged. The A32 overlay is
+          # exactly the following added files, audited in a disposable archive.
+          # Nothing in the pinned upstream source or old manifest is rewritten.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, os
+          root=Path(os.environ["RUNNER_TEMP"])/"a31/source-audit"
+          added={
+            ".github/workflows/a32-android-native-link.yml",
+            ".github/workflows/a32-fd-sectors.yml",
+            "android/a32-fd/INTEGRATION.md",
+            "android/a32-fd/test_fd_sectors.c",
+            "android/a32-fd/tests/mock/bios_disk.h",
+            "android/a32-fd/tests/test_adapter.cpp",
+            "android/a32-fd/winkit_a32_image_disk.cpp",
+            "android/a32-fd/winkit_a32_image_disk.h",
+            "android/a32-fd/winkit_fd_sectors.h",
+            "scripts/A32_BUILD_RUNTIME_SO.sh",
+          }
+          manifest=root/"MANIFEST.sha256"
+          original=manifest.read_text()
+          legacy={line.partition("  ")[2] for line in original.splitlines()}
+          assert added.isdisjoint(legacy), "A32 overlay unexpectedly replaces pinned source"
+          present={str(p.relative_to(root)) for p in root.rglob("*")
+                   if p.is_file() and p.name!="MANIFEST.sha256"
+                   and "_external" not in p.parts and "_build_outputs" not in p.parts
+                   and str(p.relative_to(root))!="reference/PoC1/transport/ethnet-poc-jvm.jar"
+                   and "__pycache__" not in p.parts and p.suffix!=".pyc"}
+          assert present-legacy == added, f"Unexpected A32 paths: {present-legacy ^ added}"
+          manifest.write_text(original + "".join(
+              hashlib.sha256((root/p).read_bytes()).hexdigest()+"  "+p+"\\n"
+              for p in sorted(added)))
+          print("A32 overlay allowlist checked:", len(added),"new files")
+          PY
           python3 "$RUNNER_TEMP/a31/source-audit/VERIFY_A10.py"
           python3 - <<'PY'
           from pathlib import Path
