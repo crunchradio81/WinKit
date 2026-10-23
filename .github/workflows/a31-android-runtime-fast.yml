@@ -1,4 +1,5 @@
 name: A31 Fast Android Startup Diagnostics
+# v39: read-only native SAF file-descriptor path probe
 # v37: Android SDL_VIDEODRIVER=android before DOSBox-X startup
 # v35: color probe verified on device; diagnose original DOSBox-X SDL_main entry
 on:
