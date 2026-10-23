@@ -44,6 +44,9 @@ jobs:
             "contrib/linux/com.dosbox_x.DOSBox-X.metainfo.xml.in":"045c79cc663ec3e922c5d2a80ee214acdac4066c",
             "make-rpm.sh.in":"1b98e7f9fef3913743766cce4fefcc9fb76b460e",
             "vs/sdl/src/cdrom/compat_SDL_cdrom.h":"02862afbbf209e82fb2af247b6d1d40acd197202",
+            "vs/sdl/src/cdrom/SDL_cdrom.c":"2d09803ebac9beb8c8a930a131ec7412b23d547e",
+            "vs/sdl/src/cdrom/SDL_syscdrom.h":"1989f8182bd18a067bee498ef5d2f82b98ed0ab3",
+            "src/hardware/snd_pc98/sound/getsnd/getsndmn.mcr":"b0a76a3e2e1bedfe267281e77e940f3950ea0a86",
           }
           for name,want in blobs.items():
             actual=subprocess.check_output(["git","hash-object",str(Path("vendor/dosbox-x")/name)],text=True).strip()
