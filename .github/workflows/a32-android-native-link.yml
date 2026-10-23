@@ -48,6 +48,7 @@ jobs:
             "android/a32-fd/winkit_fd_sectors.h",
             "scripts/A32_BUILD_RUNTIME_SO.sh",
             "scripts/A32_PATCH_NATIVE_SOURCE.py",
+            "scripts/A32_FULL_LINK_PROBE.sh",
             "android/a32-fd/A32SDLActivity.java",
           }
           manifest=root/"MANIFEST.sha256"
@@ -271,11 +272,6 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/A31_REMAINING_ARCHIVES.sh
-      - name: Attempt complete upstream DOSBox-X ARM64 emulator link
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash scripts/A31_FULL_LINK_PROBE.sh
       - name: Compile A32 imageDisk adapter against pinned upstream DOSBox-X ARM64
         shell: bash
         run: |
@@ -294,6 +290,11 @@ jobs:
           "$NDK/llvm-readelf" -h "$A31_ROOT/a32-image-disk.o" | grep -F 'AArch64'
           "$NDK/llvm-nm" -C "$A31_ROOT/a32-image-disk.o" | grep -F 'WinKitA32ReadOnlyImage::Create'
           echo 'PASS: real upstream headers and Android ARM64 object compile; guest boot not tested'
+      - name: Attempt complete upstream DOSBox-X ARM64 emulator link
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/A32_FULL_LINK_PROBE.sh
       - name: Link SDL2-loadable Android DOSBox-X libmain.so
         shell: bash
         run: |
