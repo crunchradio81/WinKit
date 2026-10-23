@@ -34,7 +34,24 @@ public final class A31DiagnosticLog {
             "Supported ABIs: " + java.util.Arrays.toString(Build.SUPPORTED_ABIS) + "\n" +
             "Guest boot: NOT VERIFIED; no guest image included\n\n" +
             "Startup checkpoints:\n" + prefs.getString("events", "(no checkpoints)") +
+            "\nDOSBox-X stdout/stderr tail (if bridge reached):\n" +
+            nativeLogTail(context) +
             "\nA native fatal signal may require Android adb logcat.\n";
+    }
+
+    private static String nativeLogTail(Context context) {
+        java.io.File file = new java.io.File(context.getFilesDir(), "a31-dosbox-stdout.txt");
+        if (!file.isFile()) return "(not captured; DOSBox-X native bridge may not have started)\n";
+        try (java.io.RandomAccessFile in = new java.io.RandomAccessFile(file, "r")) {
+            long length = in.length();
+            int last = (int)Math.min(length, 9000L);
+            in.seek(length - last);
+            byte[] b = new byte[last];
+            in.readFully(b);
+            return new String(b, java.nio.charset.StandardCharsets.UTF_8) + "\n";
+        } catch (java.io.IOException ex) {
+            return "(native log read error: " + ex.getClass().getSimpleName() + ")\n";
+        }
     }
 
     public static synchronized void clear(Context context) {
