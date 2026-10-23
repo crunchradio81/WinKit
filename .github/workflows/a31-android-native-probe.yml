@@ -217,6 +217,11 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/A31_SUBSYSTEM_ARCHIVES.sh
+      - name: Build remaining upstream DOSBox-X ARM64 static archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/A31_REMAINING_ARCHIVES.sh
       - name: Copy diagnostics and remove binaries
         if: always()
         shell: bash
