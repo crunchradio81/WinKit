@@ -1,4 +1,5 @@
 name: A31 Fast Android Startup Diagnostics
+# v34: separate native SDL2 color renderer, diagnostic escape control
 on:
   push:
     branches: [android-a31-native-boot]
