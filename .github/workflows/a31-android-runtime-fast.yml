@@ -112,6 +112,9 @@ jobs:
           grep -F 'optname == "nopromptfolder"' vendor/dosbox-x/src/gui/sdlmain.cpp
           grep -F '"-nopromptfolder"' scripts/A31_DOSBOX_ENTRY_BRIDGE.c
           grep -F 'SDL_AndroidGetInternalStoragePath' scripts/A31_DOSBOX_ENTRY_BRIDGE.c
+          grep -F 'setenv("SDL_VIDEODRIVER", "android", 1)' scripts/A31_DOSBOX_ENTRY_BRIDGE.c
+          grep -F 'putenv("SDL_VIDEODRIVER=x11")' vendor/dosbox-x/src/gui/sdlmain.cpp
+          grep -F 'Add_string("videodriver",Property::Changeable::OnlyAtStart, "")' vendor/dosbox-x/src/gui/sdlmain.cpp
           echo 'PASS pinned DOSBox-X understands Android noninteractive startup flag'
       - name: Build minimal A31 DOSBox-X SDL_main diagnostic bridge
         shell: bash
@@ -178,7 +181,7 @@ jobs:
           print("PASS original emulator, SDL2, C++, color probe, and native entry bridge bundled")
           PY
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "package: name='org.winkit.android.a31smoke'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "versionCode='36'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "versionCode='37'"
           mkdir -p "$RUNNER_TEMP/a31-output"
           cp "$APK" "$RUNNER_TEMP/a31-output/WinKit-A31-STARTUP-DIAGNOSTICS-ARM64.apk"
       - name: Publish only Java-first startup diagnostic APK
