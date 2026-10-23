@@ -34,6 +34,7 @@ public final class A31DiagnosticLog {
             "Supported ABIs: " + java.util.Arrays.toString(Build.SUPPORTED_ABIS) + "\n" +
             "Guest boot: NOT VERIFIED; image selection is inspection-only\n" +
             "Selected guest image:\n" + A31GuestDisk.savedSummary(context) + "\n\n" +
+            "Native read-only disk test:\n" + A31GuestDisk.savedNativeResult(context) + "\n\n" +
             "Startup checkpoints:\n" + prefs.getString("events", "(no checkpoints)") +
             "\nDOSBox-X stdout/stderr tail (if bridge reached):\n" +
             nativeLogTail(context) +
