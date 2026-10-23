@@ -93,20 +93,22 @@ jobs:
           NDK="$ANDROID_HOME/ndk/$ANDROID_NDK_REV/toolchains/llvm/prebuilt/linux-x86_64/bin"
           SDL2_CONFIG="$A31_ROOT/sdl2-prefix/bin/sdl2-config"
           test -x "$SDL2_CONFIG"
-          CC="$NDK/aarch64-linux-android28-clang" \
-          CXX="$NDK/aarch64-linux-android28-clang++" \
-          AR="$NDK/llvm-ar" RANLIB="$NDK/llvm-ranlib" \
-          SDL2_CONFIG="$SDL2_CONFIG" \
-          PKG_CONFIG_LIBDIR="$A31_ROOT/sdl2-prefix/lib/pkgconfig" \
-          CPPFLAGS="-I$A31_ROOT/sdl2-prefix/include/SDL2" \
-          LDFLAGS="-L$A31_ROOT/sdl2-prefix/lib" \
-          # Pinned upstream AC_ARG_ENABLE(sdl3) treats --disable-sdl3 as YES.
-          # Leave sdl3 unspecified (default no) and explicitly enable SDL2.
+          # The pinned upstream SDL3 switch treats --disable-sdl3 as enabled.
+          # Leave SDL3 unspecified and use the Android toolchain, not host GCC.
+          export CC="$NDK/aarch64-linux-android28-clang"
+          export CXX="$NDK/aarch64-linux-android28-clang++"
+          export AR="$NDK/llvm-ar"
+          export RANLIB="$NDK/llvm-ranlib"
+          export SDL2_CONFIG="$SDL2_CONFIG"
+          export PKG_CONFIG_LIBDIR="$A31_ROOT/sdl2-prefix/lib/pkgconfig"
+          export CPPFLAGS="-I$A31_ROOT/sdl2-prefix/include/SDL2"
+          export LDFLAGS="-L$A31_ROOT/sdl2-prefix/lib"
           ./configure --host=aarch64-linux-android --build=x86_64-pc-linux-gnu \
             --enable-sdl2 --disable-x11 --disable-opengl \
             --disable-gamelink --disable-sdlnet \
             2>&1 | tee "$A31_ROOT/configure.log"
           test -s config.h
+          grep -F "$NDK/aarch64-linux-android28-clang" config.log >/dev/null
           cp config.h "$A31_ROOT/generated-config.h"
           echo 'PASS Android cross-configured config.h; emulator still unlinked'
       - name: Compile genuine DOSBox-X ARM64 object
