@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Distinct A31 package, no INTERNET permission and no bundled guest media. -->
+  <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
+  <uses-feature android:name="android.hardware.gamepad" android:required="false"/>
+  <application android:label="WinKit A31 SDL2 Smoke"
+      android:allowBackup="false" android:usesCleartextTraffic="false"
+      android:theme="@android:style/Theme.Material.NoActionBar"
+      android:extractNativeLibs="true">
+    <activity android:name=".A31SDLActivity" android:exported="true"
+        android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|layoutDirection|fontScale|density|keyboard|navigation">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN"/>
+        <category android:name="android.intent.category.LAUNCHER"/>
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>
