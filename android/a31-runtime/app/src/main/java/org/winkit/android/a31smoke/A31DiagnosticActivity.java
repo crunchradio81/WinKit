@@ -69,6 +69,27 @@ public final class A31DiagnosticActivity extends Activity {
                 inspectOnly(selected);
             }
         });
+        button(column, "5 — TEST NATIVE DISK ACCESS (READ ONLY)", () -> {
+            if (checkingImage) return;
+            checkingImage = true;
+            A31DiagnosticLog.record(this, "Native guest disk read test started; no writes or mount");
+            refreshReport();
+            new Thread(() -> {
+                String answer;
+                try {
+                    answer = A31GuestDisk.nativeReadOnlyTest(this);
+                } catch (Exception e) {
+                    answer = "Native disk read FAIL: " + e.getClass().getSimpleName() +
+                        ": " + e.getMessage();
+                }
+                A31GuestDisk.saveNativeResult(this, answer);
+                A31DiagnosticLog.record(this, answer);
+                runOnUiThread(() -> {
+                    checkingImage = false;
+                    refreshReport();
+                });
+            }, "A31-NativeReadOnlyDiskTest").start();
+        });
         button(column, "Forget selection (original disk unchanged)", () -> {
             A31GuestDisk.forget(this);
             A31DiagnosticLog.record(this, "Disk selection forgotten; image untouched");
