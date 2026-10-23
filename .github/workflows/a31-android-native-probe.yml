@@ -165,7 +165,9 @@ jobs:
           set -euo pipefail
           NDK="$ANDROID_HOME/ndk/$ANDROID_NDK_REV/toolchains/llvm/prebuilt/linux-x86_64/bin"
           "$NDK/aarch64-linux-android28-clang++" --version > "$A31_ROOT/compiler-version.txt"
-          "$NDK/aarch64-linux-android28-clang++" -std=c++17 -fPIC -c \
+          # Mirror upstream src/misc/Makefile.am: RESDIR is normally supplied by Automake.
+          # Diagnostic-only path; it is NOT an Android application storage contract.
+          "$NDK/aarch64-linux-android28-clang++" -std=c++17 -fPIC -DRESDIR=\'"/data/local/tmp/winkit-a31-probe"\' -c \
             -I"$A31_ROOT/dosbox-source" \
             -I"$A31_ROOT/dosbox-source/include" \
             -I"$A31_ROOT/sdl2-prefix/include/SDL2" \
