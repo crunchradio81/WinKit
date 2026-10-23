@@ -105,6 +105,14 @@ jobs:
           "$NDK/bin/llvm-nm" -D "$LIBDIR/libprobe.so" | grep -E '[[:space:]]T[[:space:]]SDL_main$'
           "$NDK/bin/llvm-nm" -D "$LIBDIR/libprobe.so" | grep -F Java_org_winkit_android_a31smoke_A31RenderProbeActivity_probeStage
           echo 'PASS independent native SDL2 color probe linked; device video unverified'
+      - name: Verify upstream noninteractive working-directory option
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'optname == "nopromptfolder"' vendor/dosbox-x/src/gui/sdlmain.cpp
+          grep -F '"-nopromptfolder"' scripts/A31_DOSBOX_ENTRY_BRIDGE.c
+          grep -F 'SDL_AndroidGetInternalStoragePath' scripts/A31_DOSBOX_ENTRY_BRIDGE.c
+          echo 'PASS pinned DOSBox-X understands Android noninteractive startup flag'
       - name: Build minimal A31 DOSBox-X SDL_main diagnostic bridge
         shell: bash
         run: |
@@ -170,7 +178,7 @@ jobs:
           print("PASS original emulator, SDL2, C++, color probe, and native entry bridge bundled")
           PY
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "package: name='org.winkit.android.a31smoke'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "versionCode='35'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "versionCode='36'"
           mkdir -p "$RUNNER_TEMP/a31-output"
           cp "$APK" "$RUNNER_TEMP/a31-output/WinKit-A31-STARTUP-DIAGNOSTICS-ARM64.apk"
       - name: Publish only Java-first startup diagnostic APK
