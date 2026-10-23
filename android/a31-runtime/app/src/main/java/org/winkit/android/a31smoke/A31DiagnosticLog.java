@@ -32,7 +32,8 @@ public final class A31DiagnosticLog {
             "Android API: " + Build.VERSION.SDK_INT + "\n" +
             "Device: " + Build.MANUFACTURER + " " + Build.MODEL + "\n" +
             "Supported ABIs: " + java.util.Arrays.toString(Build.SUPPORTED_ABIS) + "\n" +
-            "Guest boot: NOT VERIFIED; no guest image included\n\n" +
+            "Guest boot: NOT VERIFIED; image selection is inspection-only\n" +
+            "Selected guest image:\n" + A31GuestDisk.savedSummary(context) + "\n\n" +
             "Startup checkpoints:\n" + prefs.getString("events", "(no checkpoints)") +
             "\nDOSBox-X stdout/stderr tail (if bridge reached):\n" +
             nativeLogTail(context) +

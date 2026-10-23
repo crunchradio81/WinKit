@@ -37,6 +37,7 @@ jobs:
               "android/a31-runtime/app/build.gradle.kts",
               "android/a31-runtime/app/src/main/java/org/winkit/android/a31smoke/A31DiagnosticActivity.java",
               "android/a31-runtime/app/src/main/java/org/winkit/android/a31smoke/A31DiagnosticLog.java",
+              "android/a31-runtime/app/src/main/java/org/winkit/android/a31smoke/A31GuestDisk.java",
               "android/a31-runtime/app/src/main/java/org/winkit/android/a31smoke/A31SDLActivity.java",
               "android/a31-runtime/app/src/main/java/org/winkit/android/a31smoke/A31RenderProbeActivity.java",
               "scripts/A31_SDL_RENDER_PROBE.c",
@@ -182,7 +183,7 @@ jobs:
           print("PASS original emulator, SDL2, C++, color probe, and native entry bridge bundled")
           PY
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "package: name='org.winkit.android.a31smoke'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "versionCode='37'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "versionCode='38'"
           mkdir -p "$RUNNER_TEMP/a31-output"
           cp "$APK" "$RUNNER_TEMP/a31-output/WinKit-A31-STARTUP-DIAGNOSTICS-ARM64.apk"
       - name: Publish only Java-first startup diagnostic APK

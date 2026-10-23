@@ -8,8 +8,8 @@ android {
         applicationId = "org.winkit.android.a31smoke"
         minSdk = 28
         targetSdk = 35
-        versionCode = 37
-        versionName = "0.31.7-android-sdl-video"
+        versionCode = 38
+        versionName = "0.31.8-readonly-disk-inspection"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes { getByName("release") { isMinifyEnabled = false } }
