@@ -18,3 +18,9 @@ A31 is an isolated Android branch, derived from A30. The macOS RC24.8 source and
 5. Upload **text logs only**. Never upload SDL2 binaries, guest disks, a misleading APK, or private installation media.
 
 This is not a complete emulation core link, Android Activity integration, DOS/Windows boot, or verified audio/input/storage. A successful CI probe only authorizes moving to a genuine SDL2 Android emulator link and runtime lifecycle integration. Previously built A26 Android packages are not update-safe; do not uninstall to test A31.
+
+## A31 multi-subsystem compile matrix
+
+The dedicated `scripts/A31_COMPILE_MATRIX.sh` stage tests fourteen separate upstream translation units under Android NDK Clang: CPU instructions/flags/paging, machine memory, VGA and VGA-related display state, Sound Blaster, audio mixer, keyboard, BIOS, INT10, disk BIOS, FAT disk drives, DOS kernel, and FPU.
+
+All compile checks must produce true AArch64 ELF objects and report per-file errors; the stage fails if any fail. Logs are text-only and record exact failures. A passing matrix remains a **partial core compilation**, not evidence that the full emulator links, SDL2 activity integration works, or guests boot. The next milestone is building complete component archives and a linked JNI library with runtime device verification.
