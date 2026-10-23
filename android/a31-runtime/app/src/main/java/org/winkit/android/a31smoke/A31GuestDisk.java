@@ -119,11 +119,51 @@ public final class A31GuestDisk {
             | ((b[n+2] & 255L) << 16) | ((b[n+3] & 255L) << 24);
     }
 
+    /** Borrow a file descriptor only while performing a native READ ONLY test. */
+    private static native String nativeProbeReadableFd(int fd, long size);
+
+    public static String nativeReadOnlyTest(Context context) throws IOException {
+        Uri uri = selectedUri(context);
+        if (uri == null) throw new IOException("Select YARDOMOB.raw first.");
+        try (ParcelFileDescriptor pfd = context.getContentResolver()
+                .openFileDescriptor(uri, "r")) {
+            if (pfd == null) throw new IOException("Provider did not return a descriptor.");
+            long bytes = pfd.getStatSize();
+            if (bytes < 0) {
+                try (FileInputStream input = new FileInputStream(pfd.getFileDescriptor())) {
+                    bytes = input.getChannel().size();
+                }
+            }
+            if (bytes < 1048576L || bytes % 512 != 0)
+                throw new IOException("Native descriptor is not a sector-aligned disk image.");
+            try {
+                System.loadLibrary("SDL2");
+                System.loadLibrary("bridge");
+                return nativeProbeReadableFd(pfd.getFd(), bytes);
+            } catch (UnsatisfiedLinkError error) {
+                throw new IOException("Native bridge not loadable: " + error.getMessage(),error);
+            }
+        } catch (SecurityException error) {
+            throw new IOException("No persisted Android read-only image permission.",error);
+        }
+    }
+
+    public static void saveNativeResult(Context context,String summary) {
+        context.getSharedPreferences(STORE,Context.MODE_PRIVATE)
+            .edit().putString("native-result",summary).commit();
+    }
+
+    public static String savedNativeResult(Context context) {
+        return context.getSharedPreferences(STORE,Context.MODE_PRIVATE)
+            .getString("native-result","(not tested yet)");
+    }
+
     public static void remember(Context context, Uri uri, Inspection info) {
         context.getContentResolver().takePersistableUriPermission(uri,
             Intent.FLAG_GRANT_READ_URI_PERMISSION);
         if (!context.getSharedPreferences(STORE,Context.MODE_PRIVATE).edit()
-            .putString(URI,uri.toString()).putString(SUMMARY,info.summary).commit())
+            .putString(URI,uri.toString()).putString(SUMMARY,info.summary)
+            .remove("native-result").commit())
             throw new IllegalStateException("Could not persist selected document.");
     }
 
