@@ -1,0 +1,136 @@
+name: A31 Fast Android Startup Diagnostics
+on:
+  push:
+    branches: [android-a31-native-boot]
+    paths:
+      - '.github/workflows/a31-android-runtime-fast.yml'
+      - 'android/a31-runtime/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  package-runtime-diagnostics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: android-a31-native-boot
+      - name: Verify changed Java and manifest checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,pathlib
+          d={}
+          for line in pathlib.Path("MANIFEST.sha256").read_text().splitlines():
+              if "  " in line:
+                  digest,path=line.split("  ",1)
+                  d[path]=digest
+          paths=[
+              "android/a31-runtime/app/src/main/AndroidManifest.xml",
+              "android/a31-runtime/app/build.gradle.kts",
+              "android/a31-runtime/app/src/main/java/org/winkit/android/a31smoke/A31DiagnosticActivity.java",
+              "android/a31-runtime/app/src/main/java/org/winkit/android/a31smoke/A31DiagnosticLog.java",
+              "android/a31-runtime/app/src/main/java/org/winkit/android/a31smoke/A31SDLActivity.java",
+          ]
+          for path in paths:
+              actual=hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+              assert actual==d[path],path
+          print("A31 fast diagnostic source checksums passed")
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Install Android compile SDK only (no NDK builds)
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+      - name: Retrieve last VERIFIED complete ARM64 native runtime APK
+        uses: actions/download-artifact@v4
+        with:
+          repository: crunchradio81/WinKit
+          run-id: 39980004155
+          name: WinKit-A31-SDL2-ARM64-SMOKE-NOT-BOOT-VERIFIED
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/a31-baseline
+      - name: Reuse exactly the verified baseline native libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib,zipfile
+          base=pathlib.Path("android/a31-runtime/app/src/main/jniLibs/arm64-v8a")
+          base.mkdir(parents=True,exist_ok=True)
+          packages=list(pathlib.Path("${{ runner.temp }}/a31-baseline").rglob("*.apk"))
+          assert len(packages)==1,packages
+          with zipfile.ZipFile(packages[0]) as archive:
+              for name in ("libmain.so","libSDL2.so","libc++_shared.so"):
+                  path="lib/arm64-v8a/"+name
+                  contents=archive.read(path)
+                  assert len(contents)>10000,path
+                  (base/name).write_bytes(contents)
+                  print("Reused verified native ELF",name,len(contents))
+          PY
+      - name: Fetch matching pinned upstream SDL2 Java activity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from urllib.request import urlopen
+          import time
+          rev="5d249570393f7a37e037abf22cd6012a4cc56a71"
+          base="https://raw.githubusercontent.com/libsdl-org/SDL/"+rev+"/android-project/app/src/main/java/org/libsdl/app/"
+          out=Path("android/a31-runtime/app/src/main/java/org/libsdl/app")
+          out.mkdir(parents=True,exist_ok=True)
+          names=("SDL.java","SDLActivity.java","SDLAudioManager.java","SDLControllerManager.java",
+                 "SDLSurface.java","HIDDevice.java","HIDDeviceBLESteamController.java",
+                 "HIDDeviceManager.java","HIDDeviceUSB.java")
+          for name in names:
+              for attempt in range(3):
+                  try:
+                      content=urlopen(base+name, timeout=20).read()
+                      assert len(content)>100
+                      (out/name).write_bytes(content)
+                      break
+                  except Exception:
+                      if attempt==2: raise
+                      time.sleep(2)
+          print("Pinned SDL2 Android Java files staged:",len(names))
+          PY
+      - name: Build Java-only Android startup diagnostic APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd android/a31-runtime
+          gradle --no-daemon :app:assembleDebug > "$RUNNER_TEMP/a31-fast-gradle.log" 2>&1 || {
+            tail -n 100 "$RUNNER_TEMP/a31-fast-gradle.log"
+            exit 1
+          }
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          python3 - "$APK" <<'PY'
+          import sys,zipfile
+          with zipfile.ZipFile(sys.argv[1]) as archive:
+              files=set(archive.namelist())
+          for name in ("libmain.so","libSDL2.so","libc++_shared.so"):
+              assert "lib/arm64-v8a/"+name in files,name
+          assert not any(x.lower().endswith((".raw",".img",".iso",".vhd")) for x in files)
+          print("PASS 3 native libs bundled; no guest images")
+          PY
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "package: name='org.winkit.android.a31smoke'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"              | grep -F "versionCode='32'"
+          mkdir -p "$RUNNER_TEMP/a31-output"
+          cp "$APK" "$RUNNER_TEMP/a31-output/WinKit-A31-STARTUP-DIAGNOSTICS-ARM64.apk"
+      - name: Publish only Java-first startup diagnostic APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinKit-A31-STARTUP-DIAGNOSTICS-ARM64-NOT-BOOT-VERIFIED
+          path: ${{ runner.temp }}/a31-output/WinKit-A31-STARTUP-DIAGNOSTICS-ARM64.apk
+          retention-days: 14
+          if-no-files-found: error

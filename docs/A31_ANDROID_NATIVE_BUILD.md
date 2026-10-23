@@ -70,3 +70,13 @@ The initial APK build from Actions run 39974565265 omitted `libc++_shared.so`, d
 The A31 CI now copies `libc++_shared.so` for ARM64 from the **same pinned NDK revision** as the emulator build. `scripts/A31_VERIFY_APK_RUNTIME.py` inspects all packaged AArch64 native ELF libraries and their `DT_NEEDED` dependencies. Every dependency must be either packaged in the APK or provided by Android's API-28 system NDK stubs. The checker explicitly forbids treating `libc++_shared.so` as an Android system library, checks for other ABIs and guest-disk media, and verifies the independent smoke application ID.
 
 Success only verifies packaging, ELF dependencies and the Android APK build. It does **not** establish device startup, SDL initialization, keyboard operation, sound, DOS or Windows for Workgroups boot.
+
+## A31 black-screen physical-device outcome and fast Java-first diagnostics
+
+A user installed the first properly packaged A31 Android smoke APK and reported a persistent **black screen**. This is evidence that Android opens the activity, **not** proof that SDL, DOSBox-X rendering, guest DOS, or WFW starts. A31 has not configured a guest disk.
+
+To avoid rebuilding the full 19-archive native core for Java startup diagnostics, `.github/workflows/a31-android-runtime-fast.yml` pins the previously successful run 39980004155 and reuses the exact verified native ELF libraries (`libSDL2.so`, `libmain.so`, `libc++_shared.so`) from its APK artifact. The fast workflow fetches nine matching SDL2 Android Java files at pinned revision and builds only the diagnostic APK. The full native workflow no longer triggers for Java app-only edits or manifest updates.
+
+A31 now opens a **Java-first launcher** with a native library load check, explicit launch button, and persisted lifecycle checkpoints around SDLActivity.onCreate/onResume/onPause/onDestroy/focus. A small noninteractive overlay distinguishes an active Android Java surface from a completely blank startup. Copy and Share report require no network permission or privileged logcat access. The report contains only local runtime metadata and recent lifecycle checkpoints, not guest images. Native SIGSEGV, crashes before Java callbacks, or SDL main-thread hangs may still require device ADB logcat.
+
+No guest image imported; black-screen root cause NOT YET ESTABLISHED. The diagnostic APK uses the same A31 smoke package ID, but CI debug signing can differ across runs; uninstall ONLY the A31 smoke package if Android rejects an update.

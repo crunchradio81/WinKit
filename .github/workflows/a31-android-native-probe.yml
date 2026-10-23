@@ -5,10 +5,7 @@ on:
     paths:
       - '.github/workflows/a31-android-native-probe.yml'
       - 'vendor/dosbox-x/**'
-      - 'MANIFEST.sha256'
-      - 'android/a31-runtime/**'
       - 'scripts/A31_BUILD_RUNTIME_SO.sh'
-      - 'scripts/A31_VERIFY_APK_RUNTIME.py'
       - 'scripts/A31_COMPILE_MATRIX.sh'
       - 'scripts/A31_CPU_ARCHIVE_PROBE.sh'
       - 'scripts/A31_SUBSYSTEM_ARCHIVES.sh'
