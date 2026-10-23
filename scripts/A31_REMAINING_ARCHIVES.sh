@@ -31,6 +31,7 @@ for spec in \
   libs/gui_tk:libgui_tk.a \
   libs/passthroughio:libpassthroughio.a \
   libs/mt32:libmt32.a \
+  libs/xBRZ:libxbrz.a \
   libs/fluidsynth:libfluidsynth.a \
   libs/decoders/internal:libopusint.a
 do
