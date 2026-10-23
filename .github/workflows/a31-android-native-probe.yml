@@ -167,7 +167,7 @@ jobs:
           "$NDK/aarch64-linux-android28-clang++" --version > "$A31_ROOT/compiler-version.txt"
           # Mirror upstream src/misc/Makefile.am: RESDIR is normally supplied by Automake.
           # Diagnostic-only path; it is NOT an Android application storage contract.
-          "$NDK/aarch64-linux-android28-clang++" -std=c++17 -fPIC -DRESDIR=\'"/data/local/tmp/winkit-a31-probe"\' -c \
+          "$NDK/aarch64-linux-android28-clang++" -std=c++17 -fPIC -DRESDIR='"/data/local/tmp/winkit-a31-probe"' -c \
             -I"$A31_ROOT/dosbox-source" \
             -I"$A31_ROOT/dosbox-source/include" \
             -I"$A31_ROOT/sdl2-prefix/include/SDL2" \
