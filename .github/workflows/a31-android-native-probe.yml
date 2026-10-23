@@ -15,6 +15,7 @@ jobs:
     timeout-minutes: 90
     env:
       SDL2_COMMIT: 5d249570393f7a37e037abf22cd6012a4cc56a71
+      LIBPNG_COMMIT: 4e3f57d50f552841550a36eabbb3fbcecacb7750
       ANDROID_NDK_REV: 28.2.13676358
     steps:
       - uses: actions/checkout@v4
@@ -83,6 +84,29 @@ jobs:
           test -s "$A31_ROOT/sdl2-prefix/lib/libSDL2.so"
           "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h "$A31_ROOT/sdl2-prefix/lib/libSDL2.so" | tee "$A31_ROOT/sdl2-elf.txt"
           grep -F 'AArch64' "$A31_ROOT/sdl2-elf.txt"
+      - name: Build pinned Android ARM64 libpng (DOSBox-X required)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$A31_ROOT/libpng"
+          git -C "$A31_ROOT/libpng" init -q
+          git -C "$A31_ROOT/libpng" remote add origin https://github.com/pnggroup/libpng.git
+          GIT_TERMINAL_PROMPT=0 git -C "$A31_ROOT/libpng" fetch --depth=1 --no-tags origin "$LIBPNG_COMMIT" 2>&1 | tee "$A31_ROOT/libpng-fetch.log"
+          git -C "$A31_ROOT/libpng" checkout -q --detach "$LIBPNG_COMMIT"
+          test "$(git -C "$A31_ROOT/libpng" rev-parse HEAD)" = "$LIBPNG_COMMIT"
+          NDK="$ANDROID_HOME/ndk/$ANDROID_NDK_REV"
+          cmake -S "$A31_ROOT/libpng" -B "$A31_ROOT/libpng-build" -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$A31_ROOT/libpng-prefix" \
+            -DPNG_SHARED=OFF -DPNG_STATIC=ON -DPNG_TESTS=OFF \
+            2>&1 | tee "$A31_ROOT/libpng-cmake.log"
+          cmake --build "$A31_ROOT/libpng-build" -j 3 2>&1 | tee "$A31_ROOT/libpng-compile.log"
+          cmake --install "$A31_ROOT/libpng-build" 2>&1 | tee "$A31_ROOT/libpng-install.log"
+          test -s "$A31_ROOT/libpng-prefix/lib/libpng.a"
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar" t "$A31_ROOT/libpng-prefix/lib/libpng.a" | head -15 | tee "$A31_ROOT/libpng-archive.txt"
+          echo 'PASS: Android ARM64 libpng built from pinned public source'
       - name: Cross-configure DOSBox-X using genuine Android SDL2
         shell: bash
         run: |
@@ -100,9 +124,9 @@ jobs:
           export AR="$NDK/llvm-ar"
           export RANLIB="$NDK/llvm-ranlib"
           export SDL2_CONFIG="$SDL2_CONFIG"
-          export PKG_CONFIG_LIBDIR="$A31_ROOT/sdl2-prefix/lib/pkgconfig"
-          export CPPFLAGS="-I$A31_ROOT/sdl2-prefix/include/SDL2"
-          export LDFLAGS="-L$A31_ROOT/sdl2-prefix/lib"
+          export PKG_CONFIG_LIBDIR="$A31_ROOT/sdl2-prefix/lib/pkgconfig:$A31_ROOT/libpng-prefix/lib/pkgconfig"
+          export CPPFLAGS="-I$A31_ROOT/sdl2-prefix/include/SDL2 -I$A31_ROOT/libpng-prefix/include"
+          export LDFLAGS="-L$A31_ROOT/sdl2-prefix/lib -L$A31_ROOT/libpng-prefix/lib"
           ./configure --host=aarch64-linux-android --build=x86_64-pc-linux-gnu \
             --enable-sdl2 --disable-x11 --disable-opengl \
             --disable-gamelink --disable-sdlnet \
