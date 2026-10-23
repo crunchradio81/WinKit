@@ -132,3 +132,13 @@ A31 v38 adds an offline Android Storage Access Framework `ACTION_OPEN_DOCUMENT` 
 Android DocumentsUI content URIs are **not** DOSBox-X filesystem paths. Random-access guest mounting/writes are a separate implementation milestone and must not be implied by successful inspection. This stage explicitly avoids copying the user's potentially multi-gigabyte RAW image into the APK or app data.
 
 Device test: choose the existing YARDOMOB.raw in Android's Files picker; then Copy Startup Report and check image length and MBR/partition metadata before implementing actual guest boot. Avoid uninstalling the A31 smoke app after selection because doing so revokes app-owned document grants.
+
+## A31 v39 — native read-only Android file-descriptor interoperability
+
+The user confirmed `YARDOMOB.raw` is 2,147,475,456 bytes / 4,194,288 sectors, with MBR signature 55 AA, an in-range type 0x06 partition at LBA 63 and a signed partition boot sector. These facts establish structure, **not guest boot**.
+
+A31 v39 adds a separate **TEST NATIVE DISK ACCESS (READ ONLY)** launcher action. It reopens only the previously selected Storage Access Framework URI with mode `"r"`, borrows the live descriptor into `libbridge.so` and calls `pread` against the first two relevant sectors. It then tests `fopen("/proc/self/fd/N", "rb")` against the same descriptor, while still keeping the Java-granted descriptor open. This determines whether normal DOSBox-X stdio image handling can access this SAF file directly. Results and errors are persisted in the Copy Startup Report.
+
+The native code never opens the image for writing, never issues `pwrite`, never mounts a DOSBox-X drive or boots guest code and never copies the two-gigabyte image. Only sector signatures and partition offsets are inspected. If `/proc/self/fd` reopening fails on the device, the subsequent implementation must integrate a descriptor-backed sector transport; it must not silently copy or corrupt the image. The built-in DOSBox-X shell is already physically verified on the Samsung SM-A366U running Android API 36.
+
+The v39 acceptance sequence is: install APK; existing disk-selection grant may survive an in-place update; tap **5 — TEST NATIVE DISK ACCESS (READ ONLY)**; copy startup report. Device success of the stdio path is not assumed from CI.
