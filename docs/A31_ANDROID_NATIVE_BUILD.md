@@ -44,3 +44,9 @@ First non-CPU archive run: `libints.a` (29 members) and `libfpu.a` (3 members) c
 ## Android CD-ROM backend selection
 
 The upstream SDL2 CD-ROM integration selects `linux/SDL_syscdrom.c` when `LINUX` is defined, but Android uses Bionic and should not perform Linux host physical-drive ioctl operations. A31 makes a **temporary Android-only** compile-copy adjustment so Android chooses the upstream dummy physical-CD backend (exact pinned source, GPL/LGPL notices preserved). Guest ISO/CHD image support remains distinct from host optical-drive access and still needs runtime verification. PC-98 audio compilation also now includes the upstream `getsndst.mcr` companion macro. The original vendored `src/dos/cdrom.cpp` is unmodified.
+
+## A31 further source completion and first full link probe
+
+The A31 completion matrix confirmed 17/18 extra archives; `src/misc/savestates.cpp` referenced missing in-tree upstream MiniZip source. Seven exact text-source blobs from pinned DOSBox-X commit `029bd65c5dcc7cdc7f2e14e35278620d9707d969` were restored under `vendor/dosbox-x/vs/zlib/contrib/minizip/`. CI verifies original Git blob identities. These are original upstream sources, not arbitrary new MiniZip versions.
+
+`scripts/A31_FULL_LINK_PROBE.sh` now attempts `make -C src dosbox-x` with Android cross-compiled Makefiles *after* archive checks. It records native compiler/linker failures or checks ELF architecture when successful. A linked Android AArch64 executable still does **not** establish an APK, SDL Activity integration, keyboard lifecycle, sound, synthetic DOS boot, or WFW boot.

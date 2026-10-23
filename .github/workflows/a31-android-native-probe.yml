@@ -43,6 +43,13 @@ jobs:
             "contrib/linux/dosbox-x.spec.in":"c768cdcb02091288bdbde6fe47469ea0802a0647",
             "contrib/linux/com.dosbox_x.DOSBox-X.metainfo.xml.in":"045c79cc663ec3e922c5d2a80ee214acdac4066c",
             "make-rpm.sh.in":"1b98e7f9fef3913743766cce4fefcc9fb76b460e",
+            "vs/zlib/contrib/minizip/zip.c":"abfb09d3d38a5a62a9636ff0f3a28dde71a1ce2a",
+            "vs/zlib/contrib/minizip/unzip.c":"ea05b7d62a07f6ada2cb5a7723f398d9f44a8822",
+            "vs/zlib/contrib/minizip/ioapi.c":"322a1e117435b6a438b6a8ef3e537020b131859b",
+            "vs/zlib/contrib/minizip/zip.h":"3e230d3405f603fba197929a9bf0c6c6291d8a7a",
+            "vs/zlib/contrib/minizip/unzip.h":"5cfc9c6274e75e32ae79f5d51a18fbd874f62711",
+            "vs/zlib/contrib/minizip/ioapi.h":"a2d2e6e60d9250b048d50320a60dccc9d99e0264",
+            "vs/zlib/contrib/minizip/crypt.h":"f4b93b78dc31cc28b6bd1ee3cc90f9af4b6ef2a2",
             "vs/sdl/src/cdrom/compat_SDL_cdrom.h":"02862afbbf209e82fb2af247b6d1d40acd197202",
             "vs/sdl/src/cdrom/SDL_cdrom.c":"2d09803ebac9beb8c8a930a131ec7412b23d547e",
             "vs/sdl/src/cdrom/SDL_syscdrom.h":"1989f8182bd18a067bee498ef5d2f82b98ed0ab3",
@@ -222,6 +229,11 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/A31_REMAINING_ARCHIVES.sh
+      - name: Attempt complete upstream DOSBox-X ARM64 emulator link
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/A31_FULL_LINK_PROBE.sh
       - name: Copy diagnostics and remove binaries
         if: always()
         shell: bash
