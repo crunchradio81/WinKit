@@ -37,6 +37,23 @@ jobs:
         uses: android-actions/setup-android@v4
       - name: Install pinned NDK
         run: sdkmanager --install 'ndk;28.2.13676358'
+      - name: Install upstream configuration generators
+        run: sudo apt-get update && sudo apt-get install -y autoconf automake libtool pkg-config
+      - name: Generate Android config.h using upstream Autotools
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/a31"
+          cd vendor/dosbox-x
+          autoreconf -fi 2>&1 | tee "$RUNNER_TEMP/a31/autoreconf.log"
+          NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CC="$NDK/aarch64-linux-android28-clang" \
+          CXX="$NDK/aarch64-linux-android28-clang++" \
+          AR="$NDK/llvm-ar" RANLIB="$NDK/llvm-ranlib" \
+          ./configure --host=aarch64-linux-android --build=x86_64-pc-linux-gnu \
+            --disable-sdl3 2>&1 | tee "$RUNNER_TEMP/a31/configure.log"
+          test -s config.h
+          cp config.h "$RUNNER_TEMP/a31/generated-config.h"
       - name: Attempt ARM64 upstream C++ translation unit
         shell: bash
         run: |
@@ -52,6 +69,11 @@ jobs:
             2>&1 | tee "$RUNNER_TEMP/a31/upstream-unit.log"
           echo 'PASS: one genuine upstream translation unit parsed by Android ARM64 compiler.'
           echo 'NOT PROVEN: full DOSBox-X link, Android bridge, APK, or guest boot.'
+      - name: Save configure failure log
+        if: failure()
+        shell: bash
+        run: |
+          if test -f vendor/dosbox-x/config.log; then cp vendor/dosbox-x/config.log "$RUNNER_TEMP/a31/upstream-config.log"; fi
       - name: Upload compiler diagnostics
         if: always()
         uses: actions/upload-artifact@v4
