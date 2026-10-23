@@ -26,10 +26,25 @@ public class A31SDLActivity extends SDLActivity {
     private boolean stopping = false;
     private OnBackInvokedCallback backCallback;
 
-    @Override protected String[] getLibraries() { return new String[]{"SDL2", "main"}; }
+    // libbridge.so traces calls into the existing unmodified libmain.so.
+    @Override protected String[] getLibraries() { return new String[]{"SDL2", "bridge"}; }
+    private static native int entryStage();
+    private static native int entryResult();
+    private static native String entryError();
     @Override protected String[] getArguments() { return new String[0]; }
     protected String testName() { return "DOSBox-X"; }
-    protected String extraNativeStatus() { return ""; }
+    protected String extraNativeStatus() {
+        try {
+            int stage = entryStage();
+            String message = "DOSBox entry stage=" + stage;
+            if (stage == 4) message += ", exit=" + entryResult();
+            if (stage < 0) message += ", error=" + entryError();
+            if (stage == 3) message += " (inside DOSBox-X SDL_main)";
+            return message;
+        } catch (UnsatisfiedLinkError ex) {
+            return "Native entry bridge not loaded yet";
+        }
+    }
     private void returnToDiagnostics() {
         A31DiagnosticLog.record(this, testName() + " RETURN control pressed");
         Intent i = new Intent(this, A31DiagnosticActivity.class);
