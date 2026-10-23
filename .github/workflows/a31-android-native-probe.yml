@@ -8,6 +8,7 @@ on:
       - 'MANIFEST.sha256'
       - 'scripts/A31_COMPILE_MATRIX.sh'
       - 'scripts/A31_CPU_ARCHIVE_PROBE.sh'
+      - 'scripts/A31_SUBSYSTEM_ARCHIVES.sh'
   workflow_dispatch:
 permissions:
   contents: read
@@ -197,6 +198,11 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/A31_CPU_ARCHIVE_PROBE.sh
+      - name: Build DOSBox-X BIOS DOS FPU and hardware archives on Android ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/A31_SUBSYSTEM_ARCHIVES.sh
       - name: Copy diagnostics and remove binaries
         if: always()
         shell: bash
