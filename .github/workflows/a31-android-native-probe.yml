@@ -100,8 +100,10 @@ jobs:
           PKG_CONFIG_LIBDIR="$A31_ROOT/sdl2-prefix/lib/pkgconfig" \
           CPPFLAGS="-I$A31_ROOT/sdl2-prefix/include/SDL2" \
           LDFLAGS="-L$A31_ROOT/sdl2-prefix/lib" \
+          # Pinned upstream AC_ARG_ENABLE(sdl3) treats --disable-sdl3 as YES.
+          # Leave sdl3 unspecified (default no) and explicitly enable SDL2.
           ./configure --host=aarch64-linux-android --build=x86_64-pc-linux-gnu \
-            --enable-sdl2 --disable-sdl3 --disable-x11 --disable-opengl \
+            --enable-sdl2 --disable-x11 --disable-opengl \
             --disable-gamelink --disable-sdlnet \
             2>&1 | tee "$A31_ROOT/configure.log"
           test -s config.h
