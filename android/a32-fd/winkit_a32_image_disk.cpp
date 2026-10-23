@@ -21,18 +21,53 @@ WinKitA32ReadOnlyImage *WinKitA32ReadOnlyImage::Create(int borrowed_fd,
     disk->hardDrive = true;
     disk->active = true;
     disk->diskimg = nullptr;
-    // DOSBox-X uses CHS for legacy INT 13h. 16 heads / 63 sectors
-    // gives a conservative geometry for this 2GB DOS 6.22 image.
-    // The emulated BIOS may need to reconcile this with the guest's BPB.
-    disk->heads = 16;
-    disk->sectors = 63;
-    disk->cylinders = static_cast<uint32_t>(
-        (bytes / 512) / (16u * 63u));
-    if (disk->cylinders == 0 || disk->cylinders > 1024) {
-        // Large LBA images exceed legacy 1024-cylinder BIOS geometry.
-        // Cap CHS geometry; absolute LBA reads remain full-range.
-        disk->cylinders = 1024;
+    // Read the real partition BPB before selecting legacy BIOS CHS geometry.
+    // An arbitrary 16-head translation would truncate access near 1 GiB
+    // when legacy DOS INT 13h requests sectors on this ~2 GiB image.
+    uint32_t chosenHeads = 255;
+    uint32_t chosenSectors = 63;
+    unsigned char mbr[512];
+    if (winkit_fd_disk_read(&disk->handle, 0, 1, mbr) == 0
+            && mbr[510] == 0x55 && mbr[511] == 0xaa) {
+        for (unsigned i = 0; i < 4; ++i) {
+            const unsigned p = 446 + i * 16;
+            const uint64_t first = (uint64_t)mbr[p+8]
+                | ((uint64_t)mbr[p+9] << 8) | ((uint64_t)mbr[p+10] << 16)
+                | ((uint64_t)mbr[p+11] << 24);
+            const uint64_t length = (uint64_t)mbr[p+12]
+                | ((uint64_t)mbr[p+13] << 8) | ((uint64_t)mbr[p+14] << 16)
+                | ((uint64_t)mbr[p+15] << 24);
+            if (mbr[p+4] == 0 || !first || !length
+                || first >= disk->handle.sectors
+                || length > disk->handle.sectors-first) continue;
+            unsigned char boot[512];
+            if (winkit_fd_disk_read(&disk->handle, first, 1, boot) != 0
+                || boot[510] != 0x55 || boot[511] != 0xaa) continue;
+            const uint32_t spt = (uint32_t)boot[0x18]
+                | ((uint32_t)boot[0x19] << 8);
+            const uint32_t heads = (uint32_t)boot[0x1a]
+                | ((uint32_t)boot[0x1b] << 8);
+            if (heads >= 1 && heads <= 255 && spt >= 1 && spt <= 63) {
+                const uint64_t tracks = (disk->handle.sectors
+                    + (uint64_t)heads*spt - 1) / ((uint64_t)heads*spt);
+                if (tracks <= 1024) {
+                    chosenHeads = heads;
+                    chosenSectors = spt;
+                }
+                // Otherwise keep 255/63 translation to expose all 2GB.
+            }
+            break;
+        }
     }
+    disk->heads = chosenHeads;
+    disk->sectors = chosenSectors;
+    const uint64_t divisor = (uint64_t)chosenHeads * chosenSectors;
+    const uint64_t tracks = (disk->handle.sectors + divisor - 1) / divisor;
+    if (!tracks || tracks > 1024) {
+        delete disk;
+        return nullptr; // cannot represent image within legacy CHS limits
+    }
+    disk->cylinders = static_cast<uint32_t>(tracks);
     return disk;
 }
 
