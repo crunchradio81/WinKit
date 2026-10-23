@@ -8,6 +8,7 @@ on:
       - 'MANIFEST.sha256'
       - 'android/a31-runtime/**'
       - 'scripts/A31_BUILD_RUNTIME_SO.sh'
+      - 'scripts/A31_VERIFY_APK_RUNTIME.py'
       - 'scripts/A31_COMPILE_MATRIX.sh'
       - 'scripts/A31_CPU_ARCHIVE_PROBE.sh'
       - 'scripts/A31_SUBSYSTEM_ARCHIVES.sh'
@@ -263,6 +264,12 @@ jobs:
           test "$(find "$ROOT/java/org/libsdl/app" -maxdepth 1 -name '*.java' | wc -l)" -eq 9
           cp "$A31_ROOT/a31-runtime-libs/libSDL2.so" "$ROOT/jniLibs/arm64-v8a/"
           cp "$A31_ROOT/a31-runtime-libs/libmain.so" "$ROOT/jniLibs/arm64-v8a/"
+          # libmain.so requires libc++_shared.so, which Android does not supply.
+          NDK="$ANDROID_HOME/ndk/$ANDROID_NDK_REV"
+          STL="$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+          test -s "$STL"
+          cp "$STL" "$ROOT/jniLibs/arm64-v8a/libc++_shared.so"
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h "$STL" | grep -F 'AArch64'
       - name: Assemble isolated offline A31 Android runtime smoke APK
         shell: bash
         run: |
@@ -274,15 +281,13 @@ jobs:
           }
           APK=app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
-          python3 - "$APK" <<'PY'
-          import sys,zipfile
-          with zipfile.ZipFile(sys.argv[1]) as z:
-              names=set(z.namelist())
-          assert "lib/arm64-v8a/libmain.so" in names
-          assert "lib/arm64-v8a/libSDL2.so" in names
-          assert all(not p.lower().endswith((".raw",".img",".vhd",".iso")) for p in names)
-          print("A31 APK PACKAGE PASS: SDL2 + DOSBox-X ARM64 libraries; runtime and boot unverified")
-          PY
+          NDK="$ANDROID_HOME/ndk/$ANDROID_NDK_REV/toolchains/llvm/prebuilt/linux-x86_64"
+          python3 ../../scripts/A31_VERIFY_APK_RUNTIME.py "$APK" \
+            "$NDK/bin/llvm-readelf" "$NDK/sysroot" \
+            2>&1 | tee "$A31_ROOT/android-apk-elf-closure.txt"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" \
+            | grep -F "package: name='org.winkit.android.a31smoke'"
+          echo 'A31 APK PACKAGE PASS: ARM64 dependency closure verified; device/guest boot unverified'
           cp "$APK" "$A31_ROOT/WinKit-A31-SDL2-ARM64-SMOKE-NOT-BOOT-VERIFIED.apk"
       - name: Upload isolated A31 smoke APK (not boot verified)
         if: success()
