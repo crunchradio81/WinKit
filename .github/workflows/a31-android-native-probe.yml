@@ -25,7 +25,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git branch --show-current)" = android-a31-native-boot
-          python3 VERIFY_A10.py
+          mkdir -p "$RUNNER_TEMP/a31/source-audit"
+          git archive --format=tar HEAD | tar -xf - -C "$RUNNER_TEMP/a31/source-audit"
+          python3 "$RUNNER_TEMP/a31/source-audit/VERIFY_A10.py"
           python3 - <<'PY'
           from pathlib import Path
           import json,subprocess
