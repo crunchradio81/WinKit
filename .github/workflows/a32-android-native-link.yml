@@ -1,0 +1,285 @@
+name: A32 Android ARM64 FD imageDisk Native Link
+on:
+  push:
+    branches: [android-a32-fd-disk]
+    paths:
+      - '.github/workflows/a32-android-native-link.yml'
+      - 'android/a32-fd/**'
+      - 'scripts/A32_BUILD_RUNTIME_SO.sh'
+      - 'vendor/dosbox-x/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-compile-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      SDL2_COMMIT: 5d249570393f7a37e037abf22cd6012a4cc56a71
+      LIBPNG_COMMIT: 4e3f57d50f552841550a36eabbb3fbcecacb7750
+      ANDROID_NDK_REV: 28.2.13676358
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: android-a32-fd-disk
+      - name: Verify source branch, manifest and pinned metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = android-a32-fd-disk
+          mkdir -p "$RUNNER_TEMP/a31/source-audit"
+          git archive --format=tar HEAD | tar -xf - -C "$RUNNER_TEMP/a31/source-audit"
+          python3 "$RUNNER_TEMP/a31/source-audit/VERIFY_A10.py"
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,subprocess
+          d=json.loads(Path("vendor/dosbox-x/WINKIT_SOURCE_IMPORT.json").read_text())
+          assert d["revision"]=="029bd65c5dcc7cdc7f2e14e35278620d9707d969"
+          assert not d["android_native_build_verified"] and not d["guest_boot_verified"]
+          blobs={
+            "contrib/macos/dosbox-x.plist.in":"298c210cff07ea44f386bc5b589446e059a165df",
+            "contrib/linux/dosbox-x.spec.in":"c768cdcb02091288bdbde6fe47469ea0802a0647",
+            "contrib/linux/com.dosbox_x.DOSBox-X.metainfo.xml.in":"045c79cc663ec3e922c5d2a80ee214acdac4066c",
+            "make-rpm.sh.in":"1b98e7f9fef3913743766cce4fefcc9fb76b460e",
+            "vs/zlib/contrib/minizip/zip.c":"abfb09d3d38a5a62a9636ff0f3a28dde71a1ce2a",
+            "vs/zlib/contrib/minizip/unzip.c":"ea05b7d62a07f6ada2cb5a7723f398d9f44a8822",
+            "vs/zlib/contrib/minizip/ioapi.c":"322a1e117435b6a438b6a8ef3e537020b131859b",
+            "vs/zlib/contrib/minizip/zip.h":"3e230d3405f603fba197929a9bf0c6c6291d8a7a",
+            "vs/zlib/contrib/minizip/unzip.h":"5cfc9c6274e75e32ae79f5d51a18fbd874f62711",
+            "vs/zlib/contrib/minizip/ioapi.h":"a2d2e6e60d9250b048d50320a60dccc9d99e0264",
+            "vs/zlib/contrib/minizip/crypt.h":"f4b93b78dc31cc28b6bd1ee3cc90f9af4b6ef2a2",
+            "vs/sdl/src/cdrom/compat_SDL_cdrom.h":"02862afbbf209e82fb2af247b6d1d40acd197202",
+            "vs/sdl/src/cdrom/SDL_cdrom.c":"2d09803ebac9beb8c8a930a131ec7412b23d547e",
+            "vs/sdl/src/cdrom/SDL_syscdrom.h":"1989f8182bd18a067bee498ef5d2f82b98ed0ab3",
+            "src/hardware/snd_pc98/sound/getsnd/getsndmn.mcr":"b0a76a3e2e1bedfe267281e77e940f3950ea0a86",
+            "vs/sdl/src/cdrom/dummy/SDL_syscdrom.c":"9821e979581559e81ba95f09abbf0c629f649c82",
+            "src/hardware/snd_pc98/sound/getsnd/getsndst.mcr":"90445ed371d816be14355173c505d9baf05f749f",
+          }
+          for name,want in blobs.items():
+            actual=subprocess.check_output(["git","hash-object",str(Path("vendor/dosbox-x")/name)],text=True).strip()
+            assert actual==want,(name,actual,want)
+          print("PASS: exact pinned public upstream Autotools templates")
+          PY
+      - name: Install host tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v autoreconf >/dev/null && command -v automake >/dev/null && \
+             command -v libtoolize >/dev/null && command -v pkg-config >/dev/null && \
+             command -v cmake >/dev/null && command -v ninja >/dev/null; then
+            echo "Using existing Ubuntu 24.04 Autotools/CMake/Ninja host tools"
+          else
+            sudo apt-get update -o Acquire::Retries=2 -o Acquire::http::Timeout=20
+            sudo apt-get install -y autoconf automake libtool pkg-config cmake ninja-build
+          fi
+          mkdir -p "$RUNNER_TEMP/a31"
+          echo "A31_ROOT=$RUNNER_TEMP/a31" >> "$GITHUB_ENV"
+      - uses: android-actions/setup-android@v4
+      - name: Install pinned Android ARM64 NDK
+        run: sdkmanager --install "ndk;$ANDROID_NDK_REV"
+      - name: Checkout exact public SDL2 revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$A31_ROOT/SDL"
+          git -C "$A31_ROOT/SDL" init -q
+          git -C "$A31_ROOT/SDL" remote add origin https://github.com/libsdl-org/SDL.git
+          GIT_TERMINAL_PROMPT=0 git -C "$A31_ROOT/SDL" fetch --depth=1 --no-tags origin "$SDL2_COMMIT" 2>&1 | tee "$A31_ROOT/sdl2-fetch.log"
+          git -C "$A31_ROOT/SDL" checkout -q --detach "$SDL2_COMMIT"
+          test "$(git -C "$A31_ROOT/SDL" rev-parse HEAD)" = "$SDL2_COMMIT"
+      - name: Build native Android SDL2 ARM64 shared library
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/$ANDROID_NDK_REV"
+          cmake -S "$A31_ROOT/SDL" -B "$A31_ROOT/sdl2-build" -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$A31_ROOT/sdl2-prefix" \
+            -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF \
+            2>&1 | tee "$A31_ROOT/sdl2-cmake.log"
+          cmake --build "$A31_ROOT/sdl2-build" -j 3 2>&1 | tee "$A31_ROOT/sdl2-compile.log"
+          cmake --install "$A31_ROOT/sdl2-build" 2>&1 | tee "$A31_ROOT/sdl2-install.log"
+          test -s "$A31_ROOT/sdl2-prefix/lib/libSDL2.so"
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h "$A31_ROOT/sdl2-prefix/lib/libSDL2.so" | tee "$A31_ROOT/sdl2-elf.txt"
+          grep -F 'AArch64' "$A31_ROOT/sdl2-elf.txt"
+      - name: Build pinned Android ARM64 libpng (DOSBox-X required)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$A31_ROOT/libpng"
+          git -C "$A31_ROOT/libpng" init -q
+          git -C "$A31_ROOT/libpng" remote add origin https://github.com/pnggroup/libpng.git
+          GIT_TERMINAL_PROMPT=0 git -C "$A31_ROOT/libpng" fetch --depth=1 --no-tags origin "$LIBPNG_COMMIT" 2>&1 | tee "$A31_ROOT/libpng-fetch.log"
+          git -C "$A31_ROOT/libpng" checkout -q --detach "$LIBPNG_COMMIT"
+          test "$(git -C "$A31_ROOT/libpng" rev-parse HEAD)" = "$LIBPNG_COMMIT"
+          NDK="$ANDROID_HOME/ndk/$ANDROID_NDK_REV"
+          cmake -S "$A31_ROOT/libpng" -B "$A31_ROOT/libpng-build" -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$A31_ROOT/libpng-prefix" \
+            -DPNG_SHARED=OFF -DPNG_STATIC=ON -DPNG_TESTS=OFF \
+            2>&1 | tee "$A31_ROOT/libpng-cmake.log"
+          cmake --build "$A31_ROOT/libpng-build" -j 3 2>&1 | tee "$A31_ROOT/libpng-compile.log"
+          cmake --install "$A31_ROOT/libpng-build" 2>&1 | tee "$A31_ROOT/libpng-install.log"
+          test -s "$A31_ROOT/libpng-prefix/lib/libpng.a"
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar" t "$A31_ROOT/libpng-prefix/lib/libpng.a" | head -15 | tee "$A31_ROOT/libpng-archive.txt"
+          echo 'PASS: Android ARM64 libpng built from pinned public source'
+      - name: Cross-configure DOSBox-X using genuine Android SDL2
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a vendor/dosbox-x "$A31_ROOT/dosbox-source"
+          cd "$A31_ROOT/dosbox-source"
+          # Workaround applies ONLY to the disposable Android build copy.
+          # Pinned upstream routes *-linux-android* through generic Linux,
+          # incorrectly injecting -lrt (unavailable in Android/Bionic).
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("configure.ac")
+          contents=p.read_text()
+          original='    *-*-linux*)\n       AC_DEFINE(LINUX, 1, [Compiling on GNU/Linux])'
+          replacement=('    *-*-linux-android*)\n'
+                       '       AC_DEFINE(LINUX, 1, [Compiling for Android/Linux])\n'
+                       '       CXXFLAGS="$CXXFLAGS -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L"\n'
+                       '       ;;\n'
+                       + original)
+          assert contents.count(original)==1, "Pinned upstream host-case changed; stop instead of guessing"
+          p.write_text(contents.replace(original,replacement,1))
+          # Android cannot pass through physical Linux CD-ROM drives; select
+          # upstream's dummy physical CD backend, not its Linux ioctl backend.
+          # CD image / ISO guest emulation remains a separate DOSBox-X feature.
+          cdrom=Path("src/dos/cdrom.cpp")
+          original_cdrom="#elif defined(LINUX)\n#define SDL_CDROM_LINUX"
+          assert cdrom.read_text().count(original_cdrom)==1
+          cdrom.write_text(cdrom.read_text().replace(
+              original_cdrom,
+              "#elif defined(LINUX) && !defined(__ANDROID__)\n#define SDL_CDROM_LINUX", 1))
+          print("A31: patched Android Bionic target separately from GNU/Linux in temporary source")
+          PY
+          autoreconf -fi 2>&1 | tee "$A31_ROOT/autoreconf.log"
+          NDK="$ANDROID_HOME/ndk/$ANDROID_NDK_REV/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          SDL2_CONFIG="$A31_ROOT/sdl2-prefix/bin/sdl2-config"
+          test -x "$SDL2_CONFIG"
+          # The pinned upstream SDL3 switch treats --disable-sdl3 as enabled.
+          # Leave SDL3 unspecified and use the Android toolchain, not host GCC.
+          export CFLAGS="-fPIC"
+          export CXXFLAGS="-fPIC"
+          export CC="$NDK/aarch64-linux-android28-clang"
+          export CXX="$NDK/aarch64-linux-android28-clang++"
+          export AR="$NDK/llvm-ar"
+          export RANLIB="$NDK/llvm-ranlib"
+          export SDL2_CONFIG="$SDL2_CONFIG"
+          export PKG_CONFIG_LIBDIR="$A31_ROOT/sdl2-prefix/lib/pkgconfig:$A31_ROOT/libpng-prefix/lib/pkgconfig"
+          export CPPFLAGS="-I$A31_ROOT/sdl2-prefix/include/SDL2 -I$A31_ROOT/libpng-prefix/include"
+          export LDFLAGS="-L$A31_ROOT/sdl2-prefix/lib -L$A31_ROOT/libpng-prefix/lib"
+          # Statically built libpng references frexp/modf/pow, provided by Android libm.
+          export LIBS="-lm"
+          ./configure --host=aarch64-linux-android --build=x86_64-pc-linux-gnu \
+            --enable-sdl2 --disable-x11 --disable-opengl \
+            --disable-gamelink --disable-sdlnet \
+            2>&1 | tee "$A31_ROOT/configure.log"
+          test -s config.h
+          grep -F "$NDK/aarch64-linux-android28-clang" config.log >/dev/null
+          if grep -E -- '(^|[[:space:]])-lrt([[:space:]]|$)' "$A31_ROOT/configure.log" >/dev/null; then
+            echo "::error::Bionic cross-configure unexpectedly used separate librt" >&2
+            exit 1
+          fi
+          grep -E '^#define (C_LIBPNG|C_LIBZ) 1' config.h | tee "$A31_ROOT/png-zlib-flags.txt"
+          cp config.h "$A31_ROOT/generated-config.h"
+          echo 'PASS Android cross-configured config.h; emulator still unlinked'
+      - name: Compile genuine DOSBox-X ARM64 object
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/$ANDROID_NDK_REV/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          "$NDK/aarch64-linux-android28-clang++" --version > "$A31_ROOT/compiler-version.txt"
+          # Mirror upstream src/misc/Makefile.am: RESDIR is normally supplied by Automake.
+          # Diagnostic-only path; it is NOT an Android application storage contract.
+          "$NDK/aarch64-linux-android28-clang++" -std=c++17 -fPIC -DRESDIR='"/data/local/tmp/winkit-a31-probe"' -c \
+            -I"$A31_ROOT/dosbox-source" \
+            -I"$A31_ROOT/dosbox-source/include" \
+            -I"$A31_ROOT/sdl2-prefix/include/SDL2" \
+            "$A31_ROOT/dosbox-source/src/misc/cross.cpp" \
+            -o "$A31_ROOT/dosbox-cross.o" \
+            2>&1 | tee "$A31_ROOT/upstream-unit.log"
+          test -s "$A31_ROOT/dosbox-cross.o"
+          "$NDK/llvm-readelf" -h "$A31_ROOT/dosbox-cross.o" | tee "$A31_ROOT/dosbox-object-elf.txt"
+          grep -F 'AArch64' "$A31_ROOT/dosbox-object-elf.txt"
+          echo 'PASS ARM64 upstream C++ object compiled; emulator link, APK and boot UNVERIFIED'
+      - name: Compile DOSBox-X CPU, memory, BIOS, video, audio and disk ARM64 matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/A31_COMPILE_MATRIX.sh
+      - name: Build upstream DOSBox-X complete CPU ARM64 archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/A31_CPU_ARCHIVE_PROBE.sh
+      - name: Build DOSBox-X BIOS DOS FPU and hardware archives on Android ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/A31_SUBSYSTEM_ARCHIVES.sh
+      - name: Build remaining upstream DOSBox-X ARM64 static archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/A31_REMAINING_ARCHIVES.sh
+      - name: Attempt complete upstream DOSBox-X ARM64 emulator link
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/A31_FULL_LINK_PROBE.sh
+      - name: Compile A32 imageDisk adapter against pinned upstream DOSBox-X ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/$ANDROID_NDK_REV/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          SRC="$A31_ROOT/dosbox-source"
+          "$NDK/aarch64-linux-android28-clang++" -std=c++17 -fPIC \
+            -D_FILE_OFFSET_BITS=64 -DRESDIR='"/data/local/tmp/winkit-a32-probe"' \
+            -I"$SRC" -I"$SRC/include" -I"$SRC/src" \
+            -I"$A31_ROOT/sdl2-prefix/include/SDL2" \
+            -I"$A31_ROOT/libpng-prefix/include" \
+            -I"$GITHUB_WORKSPACE/android/a32-fd" \
+            -c "$GITHUB_WORKSPACE/android/a32-fd/winkit_a32_image_disk.cpp" \
+            -o "$A31_ROOT/a32-image-disk.o" \
+            2>&1 | tee "$A31_ROOT/a32-adapter-compile.log"
+          "$NDK/llvm-readelf" -h "$A31_ROOT/a32-image-disk.o" | grep -F 'AArch64'
+          "$NDK/llvm-nm" -C "$A31_ROOT/a32-image-disk.o" | grep -F 'WinKitA32ReadOnlyImage::Create'
+          echo 'PASS: real upstream headers and Android ARM64 object compile; guest boot not tested'
+      - name: Link SDL2-loadable Android DOSBox-X libmain.so
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/A32_BUILD_RUNTIME_SO.sh
+      - name: Stage A32 linked native artifact (NOT a bootable APK)
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$A31_ROOT/a31-runtime-libs/libmain.so"
+          mkdir -p "$A31_ROOT/a32-publish"
+          cp "$A31_ROOT/a31-runtime-libs/libmain.so" "$A31_ROOT/a32-publish/libmain.so"
+          echo 'A32 native imageDisk adapter linked; no SAF JNI handoff or guest attachment yet.' > "$A31_ROOT/a32-publish/STATUS.txt"
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: WinKit-A32-ARM64-LIBMAIN-ADAPTER-NOT-BOOTABLE
+          path: ${{ runner.temp }}/a31/a32-publish/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Publish native link diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinKit-A32-native-link-logs
+          path: |
+            ${{ runner.temp }}/a31/*.log
+            ${{ runner.temp }}/a31/*.txt
+          if-no-files-found: warn
+          retention-days: 14
