@@ -105,3 +105,93 @@ Int13Status WinKitA32ReadOnlyImage::Write_Sector(
     uint32_t, uint32_t, uint32_t, const void *, unsigned int) {
     return Int13Status::WriteProtected;
 }
+
+
+#if defined(__ANDROID__)
+#include <jni.h>
+#include <cstdio>
+#include <cstring>
+
+/* One file is staged by A32SDLActivity.getArguments() on SDLThread, BEFORE
+ * native SDL_main begins. The original Java ParcelFileDescriptor stays owned
+ * by Java; this copy is read-only, duplicated, and not a pseudo-path. */
+static winkit_fd_disk a32_staged{-1, 0};
+static bool a32_attached = false;
+
+/* These functions belong to the pinned DOSBox-X core (dos_programs.cpp).
+ * Never replace the refcount protocol by directly assigning imageDiskList. */
+extern bool AttachToBiosByIndex(imageDisk *image, unsigned char bios_index);
+extern bool AttachToBiosAndIdeByIndex(imageDisk *image, unsigned char bios_index,
+                                      unsigned char ide_index, bool ide_slave);
+extern void IDE_Auto(signed char &index, bool &slave);
+extern void updateDPT(void);
+extern imageDisk *imageDiskList[];
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_org_winkit_android_a31smoke_A32SDLActivity_nativeStageDiskFd(
+    JNIEnv *env, jclass, jint borrowed_fd, jlong length) {
+    // The SDL thread prepares a new session. Never silently reuse a stale fd.
+    winkit_fd_disk_close(&a32_staged);
+    a32_attached = false;
+    if (length <= 0) {
+        return env->NewStringUTF("A32 SAF descriptor rejected: nonpositive size");
+    }
+    int rc = winkit_fd_disk_open(&a32_staged, borrowed_fd, (uint64_t)length);
+    if (rc) {
+        char status[160];
+        snprintf(status, sizeof(status), "A32 SAF descriptor rejected errno=%d", rc);
+        return env->NewStringUTF(status);
+    }
+    unsigned char sector[512];
+    rc = winkit_fd_disk_read(&a32_staged, 0, 1, sector);
+    if (rc || sector[510] != 0x55 || sector[511] != 0xaa) {
+        winkit_fd_disk_close(&a32_staged);
+        return env->NewStringUTF("A32 SAF descriptor rejected: MBR read/signature failed");
+    }
+    char status[180];
+    snprintf(status, sizeof(status),
+        "A32 SAF read-only descriptor staged: %llu sectors; BIOS attachment pending",
+        (unsigned long long)a32_staged.sectors);
+    return env->NewStringUTF(status);
+}
+
+/* Called on the emulator thread after BIOS_SetupDisks prepares its callbacks
+ * and disk parameter tables. Only one BIOS hard disk is staged at slot 2
+ * (BIOS drive 0x80). On failure, DOSBox-X continues to its normal shell. */
+extern "C" void winkit_a32_attach_pending_disk(void) {
+    if (a32_attached || a32_staged.fd < 0) return;
+    if (imageDiskList[2] != nullptr) {
+        fprintf(stderr, "[A32] BIOS HDD slot 2 occupied; leaving existing disk unchanged\n");
+        return;
+    }
+    const uint64_t length = a32_staged.sectors * UINT64_C(512);
+    WinKitA32ReadOnlyImage *disk =
+        WinKitA32ReadOnlyImage::Create(a32_staged.fd, length);
+    if (!disk) {
+        fprintf(stderr, "[A32] Create failed; not attaching SAF disk\n");
+        winkit_fd_disk_close(&a32_staged);
+        return;
+    }
+
+    signed char ide = -1;
+    bool slave = false;
+    IDE_Auto(ide, slave);
+    const bool ok = ide >= 0
+        ? AttachToBiosAndIdeByIndex(disk, 2, (unsigned char)ide, slave)
+        : AttachToBiosByIndex(disk, 2);
+    if (!ok) {
+        fprintf(stderr, "[A32] BIOS hard disk attachment rejected\n");
+        delete disk;
+        winkit_fd_disk_close(&a32_staged);
+        return;
+    }
+    if (ide < 0) updateDPT();
+    a32_attached = true;
+    fprintf(stderr, "[A32] BIOS 0x80 attached read only, %llu sectors, IDE=%d, CHS=%u/%u/%u\n",
+        (unsigned long long)a32_staged.sectors, (int)ide,
+        disk->cylinders, disk->heads, disk->sectors);
+    // DOSBox-X owns the disk object through AttachToBios* -> Addref().
+    // Release the staging lease; the object owns a separate dup().
+    winkit_fd_disk_close(&a32_staged);
+}
+#endif
