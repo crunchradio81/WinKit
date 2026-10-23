@@ -40,3 +40,7 @@ The next A31 validation now invokes upstream `make` targets for `ints/libints.a`
 ## A31 native archive dependency recovery
 
 First non-CPU archive run: `libints.a` (29 members) and `libfpu.a` (3 members) compile successfully for Android ARM64. DOS compilation encountered a missing `vs/sdl/src/cdrom/SDL_cdrom.c`; hardware compilation encountered `snd_pc98/sound/getsnd/getsndmn.mcr`. Restored both from exact pinned upstream along with required `SDL_syscdrom.h`, with Git blob verification. The CD-ROM source may still rely on unimplemented platform callbacks at **link/runtime** time. A successful archive compilation does not certify CD/DVD support. No vendor binary media or guest OS images are included.
+
+## Android CD-ROM backend selection
+
+The upstream SDL2 CD-ROM integration selects `linux/SDL_syscdrom.c` when `LINUX` is defined, but Android uses Bionic and should not perform Linux host physical-drive ioctl operations. A31 makes a **temporary Android-only** compile-copy adjustment so Android chooses the upstream dummy physical-CD backend (exact pinned source, GPL/LGPL notices preserved). Guest ISO/CHD image support remains distinct from host optical-drive access and still needs runtime verification. PC-98 audio compilation also now includes the upstream `getsndst.mcr` companion macro. The original vendored `src/dos/cdrom.cpp` is unmodified.
