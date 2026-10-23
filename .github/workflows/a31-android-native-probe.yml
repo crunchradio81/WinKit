@@ -6,6 +6,7 @@ on:
       - '.github/workflows/a31-android-native-probe.yml'
       - 'vendor/dosbox-x/**'
       - 'MANIFEST.sha256'
+      - 'scripts/A31_COMPILE_MATRIX.sh'
   workflow_dispatch:
 permissions:
   contents: read
@@ -178,6 +179,11 @@ jobs:
           "$NDK/llvm-readelf" -h "$A31_ROOT/dosbox-cross.o" | tee "$A31_ROOT/dosbox-object-elf.txt"
           grep -F 'AArch64' "$A31_ROOT/dosbox-object-elf.txt"
           echo 'PASS ARM64 upstream C++ object compiled; emulator link, APK and boot UNVERIFIED'
+      - name: Compile DOSBox-X CPU, memory, BIOS, video, audio and disk ARM64 matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/A31_COMPILE_MATRIX.sh
       - name: Copy diagnostics and remove binaries
         if: always()
         shell: bash
