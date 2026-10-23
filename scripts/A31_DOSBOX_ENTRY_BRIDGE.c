@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <stdlib.h>
 
 static atomic_int g_stage = ATOMIC_VAR_INIT(0);
 static atomic_int g_result = ATOMIC_VAR_INIT(0);
@@ -105,6 +106,19 @@ int SDL_main(int argc, char **argv) {
         startup_argv[startup_argc++] = argv[i];
     startup_argv[startup_argc++] = (char *)"-nopromptfolder";
     startup_argv[startup_argc] = NULL;
+    /*
+     * Pinned upstream sdlmain.cpp defaults to SDL_VIDEODRIVER=x11 on LINUX
+     * only when SDL_VIDEODRIVER is unset. This Android NDK build defines
+     * LINUX but links Android SDL2, whose video driver is named "android".
+     * Select that native driver before executing the original SDL_main.
+     */
+    if (setenv("SDL_VIDEODRIVER", "android", 1) != 0) {
+        snprintf(g_error,sizeof(g_error),"Unable to select Android SDL video backend (errno=%d)",errno);
+        atomic_store(&g_stage,-5);
+        fprintf(stderr,"[A31 ENTRY] %s\n",g_error);
+        return 105;
+    }
+    fprintf(stderr,"[A31 ENTRY] SDL_VIDEODRIVER=%s\n",getenv("SDL_VIDEODRIVER"));
     fprintf(stderr,"[A31 ENTRY] private working directory: %s\n",private_dir);
     fprintf(stderr,"[A31 ENTRY] -nopromptfolder enabled, no interactive stdin required\n");
     fprintf(stderr,"[A31 ENTRY] calling real DOSBox-X SDL_main\n");
