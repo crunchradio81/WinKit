@@ -59,7 +59,7 @@ jobs:
                    and "__pycache__" not in p.parts and p.suffix!=".pyc"}
           assert present-legacy == added, f"Unexpected A32 paths: {present-legacy ^ added}"
           manifest.write_text(original + "".join(
-              hashlib.sha256((root/p).read_bytes()).hexdigest()+"  "+p+"\\n"
+              hashlib.sha256((root/p).read_bytes()).hexdigest()+"  "+p+"\n"
               for p in sorted(added)))
           print("A32 overlay allowlist checked:", len(added),"new files")
           PY
